@@ -7,6 +7,7 @@
 <title>Corbeille · <%= siteName %></title>
 <link rel="stylesheet" href="/static/css/app.css?v=8" />
 <link rel="stylesheet" href="/static/css/vault.css?v=8" />
+<link rel="stylesheet" href="/static/css/social.css?v=8" />
 </head>
 <body data-theme="<%= me.theme || 'dark' %>">
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -51,6 +52,7 @@
     <button type="button" class="danger" data-act="delete-permanent">🗑️ Supprimer définitivement</button>
   </div>
   <div class="toast" id="toast"></div>
+  <script src="/static/js/social.js?v=8"></script>
   <script src="/static/js/trash.js?v=8"></script>
 </body>
 </html>

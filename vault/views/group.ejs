@@ -34,15 +34,30 @@
             <% messages.forEach(function(m){ %>
               <div class="msg-row <%= m.sender_id === meId ? 'mine' : 'theirs' %>">
                 <% if (m.sender_id !== meId) { %><div class="msg-sender"><%= m.sender_name %></div><% } %>
-                <div class="msg-bubble"><%= m.content %></div>
+                <% if (m.media_key) { %>
+                  <% if ((m.media_mime||'').startsWith('image/')) { %>
+                    <a href="/api/messages/<%= m.id %>/media" target="_blank"><img class="msg-media" src="/api/messages/<%= m.id %>/media" loading="lazy" /></a>
+                  <% } else if ((m.media_mime||'').startsWith('video/')) { %>
+                    <video class="msg-media" src="/api/messages/<%= m.id %>/media" controls preload="metadata"></video>
+                  <% } else { %>
+                    <a class="msg-file" href="/api/messages/<%= m.id %>/media" target="_blank">📄 <%= m.media_name || 'Fichier' %></a>
+                  <% } %>
+                <% } %>
+                <% if (m.content) { %><div class="msg-bubble"><%= m.content %></div><% } %>
                 <div class="msg-time"><%= new Date(m.created_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) %></div>
               </div>
             <% }) %>
           </div>
           <form class="chat-input-row" id="chatForm">
+            <button type="button" id="attachBtn" class="attach-btn" title="Joindre une photo, vidéo ou document"><%- icon('paperclip') %></button>
+            <input type="file" id="mediaInput" accept="image/*,video/*,application/pdf,.doc,.docx,.txt" hidden />
             <input type="text" id="chatInput" placeholder="Écrire au groupe..." maxlength="2000" autocomplete="off" />
             <button type="submit">➤</button>
           </form>
+          <div class="attach-preview" id="attachPreview" hidden>
+            <span id="attachName"></span>
+            <button type="button" id="attachCancel">✕</button>
+          </div>
         </div>
 
         <div class="group-side">
@@ -73,24 +88,50 @@
     const groupId = <%= group.id %>;
     let since = <%= messages.length ? messages[messages.length-1].created_at : 0 %>;
     const box = document.getElementById('chatMessages');
+    function mediaHtml(m) {
+      if (!m.media_key && !m.media_mime) return '';
+      const url = '/api/messages/' + m.id + '/media';
+      if ((m.media_mime || '').startsWith('image/')) return `<a href="${url}" target="_blank"><img class="msg-media" src="${url}" loading="lazy" /></a>`;
+      if ((m.media_mime || '').startsWith('video/')) return `<video class="msg-media" src="${url}" controls preload="metadata"></video>`;
+      return `<a class="msg-file" href="${url}" target="_blank">📄 ${m.media_name || 'Fichier'}</a>`;
+    }
     function addMsg(m) {
       const el = document.createElement('div');
       el.className = 'msg-row ' + (m.sender_id === <%= meId %> ? 'mine' : 'theirs');
       if (m.sender_id !== <%= meId %>) { const s = document.createElement('div'); s.className = 'msg-sender'; s.textContent = m.sender_name || ''; el.appendChild(s); }
-      const b = document.createElement('div'); b.className = 'msg-bubble'; b.textContent = m.content;
+      const media = mediaHtml(m);
+      if (media) el.insertAdjacentHTML('beforeend', media);
+      if (m.content) { const b = document.createElement('div'); b.className = 'msg-bubble'; b.textContent = m.content; el.appendChild(b); }
       const t = document.createElement('div'); t.className = 'msg-time'; t.textContent = new Date(m.created_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
-      el.appendChild(b); el.appendChild(t); box.appendChild(el);
+      el.appendChild(t); box.appendChild(el);
       box.scrollTop = box.scrollHeight;
     }
     box.scrollTop = box.scrollHeight;
+
+    const attachBtn = document.getElementById('attachBtn'), mediaInput = document.getElementById('mediaInput');
+    const attachPreview = document.getElementById('attachPreview'), attachName = document.getElementById('attachName');
+    attachBtn.addEventListener('click', () => mediaInput.click());
+    mediaInput.addEventListener('change', () => {
+      if (mediaInput.files[0]) { attachName.textContent = '📎 ' + mediaInput.files[0].name; attachPreview.hidden = false; }
+    });
+    document.getElementById('attachCancel').addEventListener('click', () => { mediaInput.value = ''; attachPreview.hidden = true; });
+
     document.getElementById('chatForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const input = document.getElementById('chatInput');
-      const content = input.value.trim(); if (!content) return;
-      input.value = '';
-      const r = await fetch('/api/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ group_id: groupId, content }) });
+      const content = input.value.trim();
+      const file = mediaInput.files[0];
+      if (!content && !file) return;
+      input.value = ''; attachPreview.hidden = true;
+      const fd = new FormData();
+      fd.append('group_id', groupId);
+      fd.append('content', content);
+      if (file) fd.append('media', file);
+      mediaInput.value = '';
+      const r = await fetch('/api/messages/send', { method: 'POST', body: fd });
       const data = await r.json();
-      if (r.ok) { addMsg({ sender_id: <%= meId %>, content, created_at: data.created_at }); since = data.created_at; }
+      if (r.ok) { addMsg({ id: data.id, sender_id: <%= meId %>, content, media_mime: data.media ? data.media.mime : '', media_name: data.media ? data.media.name : '', created_at: data.created_at }); since = data.created_at; }
+      else alert(data.message || data.error || 'Erreur lors de l\'envoi');
     });
     async function poll() {
       try {

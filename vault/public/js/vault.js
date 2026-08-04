@@ -1,10 +1,5 @@
 const $ = (id) => document.getElementById(id);
 
-/* ---------- Menu mobile ---------- */
-const sidebar = $('sidebar'), sidebarOverlay = $('sidebarOverlay'), menuToggle = $('menuToggle');
-if (menuToggle) menuToggle.addEventListener('click', () => { sidebar.classList.add('open'); sidebarOverlay.classList.add('show'); });
-if (sidebarOverlay) sidebarOverlay.addEventListener('click', () => { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('show'); });
-
 /* ---------- Toast ---------- */
 let toastTimer = null;
 function showToast(msg, isError) {

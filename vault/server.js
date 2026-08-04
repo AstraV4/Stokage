@@ -16,6 +16,10 @@ const r2 = require('./r2');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const app = express();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1024 * 1024 * 1024 } // 1 Go par fichier (limite technique, pas la limite de quota)
+});
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 }, // 8 Mo max pour une photo de profil
@@ -305,6 +309,52 @@ app.post('/logout', (req, res) => { req.session.destroy(() => res.redirect('/log
 //  COMPTE (mot de passe, theme, stockage)
 // ===========================================================================
 const THEMES = ['dark', 'light', 'violet'];
+// ===========================================================================
+//  REGLAGES
+// ===========================================================================
+app.get('/settings', requireAuth, (req, res) => {
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  res.render('settings', { u, saved: req.query.saved || '' });
+});
+app.post('/settings/theme', requireAuth, (req, res) => {
+  const theme = THEMES.includes(req.body.theme) ? req.body.theme : 'dark';
+  db.prepare('UPDATE users SET theme = ? WHERE id = ?').run(theme, req.session.userId);
+  res.redirect('/settings?saved=theme');
+});
+app.post('/settings/privacy', requireAuth, (req, res) => {
+  db.prepare('UPDATE users SET allow_stranger_requests = ?, allow_stranger_shares = ? WHERE id = ?')
+    .run(req.body.allow_stranger_requests ? 1 : 0, req.body.allow_stranger_shares ? 1 : 0, req.session.userId);
+  res.redirect('/settings?saved=privacy');
+});
+app.post('/settings/notifications', requireAuth, (req, res) => {
+  db.prepare('UPDATE users SET notify_friend_request = ?, notify_share = ?, notify_message = ? WHERE id = ?')
+    .run(req.body.notify_friend_request ? 1 : 0, req.body.notify_share ? 1 : 0, req.body.notify_message ? 1 : 0, req.session.userId);
+  res.redirect('/settings?saved=notifications');
+});
+app.post('/settings/display', requireAuth, (req, res) => {
+  const view = req.body.default_view === 'list' ? 'list' : 'grid';
+  db.prepare('UPDATE users SET default_view = ? WHERE id = ?').run(view, req.session.userId);
+  res.redirect('/settings?saved=display');
+});
+
+// ===========================================================================
+//  NOTIFICATIONS
+// ===========================================================================
+app.get('/api/notifications', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const rows = db.prepare(`
+    SELECT n.*, usr.username AS actor_name, usr.avatar_key AS actor_avatar
+    FROM notifications n JOIN users usr ON usr.id = n.actor_id
+    WHERE n.user_id = ? ORDER BY n.created_at DESC LIMIT 30
+  `).all(u.id);
+  const unread = db.prepare('SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND read_at = 0').get(u.id).c;
+  res.json({ notifications: rows.map(r => ({ ...r, data: JSON.parse(r.data || '{}') })), unread });
+});
+app.post('/api/notifications/read', requireAuth, (req, res) => {
+  db.prepare('UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at = 0').run(Date.now(), res.locals.me.id);
+  res.json({ ok: true });
+});
+
 app.get('/account', requireAuth, (req, res) => {
   const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
   res.render('account', {
@@ -494,6 +544,17 @@ function areFriends(userA, userB) {
   const f = db.prepare("SELECT 1 FROM friendships WHERE user_a = ? AND user_b = ? AND status = 'accepted'").get(a, b);
   return !!f;
 }
+// Cree une notification, sauf si l'utilisateur a desactive ce type dans ses reglages
+const NOTIF_PREF_COL = { friend_request: 'notify_friend_request', share: 'notify_share', message: 'notify_message' };
+function notify(userId, type, actorId, data) {
+  const col = NOTIF_PREF_COL[type];
+  if (col) {
+    const pref = db.prepare(`SELECT ${col} AS v FROM users WHERE id = ?`).get(userId);
+    if (pref && pref.v === 0) return; // desactive par l'utilisateur
+  }
+  db.prepare('INSERT INTO notifications (user_id, type, actor_id, data, created_at) VALUES (?,?,?,?,?)')
+    .run(userId, type, actorId, JSON.stringify(data || {}), Date.now());
+}
 
 // Page "Discussions" : vue d'ensemble de toutes les conversations (amis + groupes)
 app.get('/messages', requireAuth, (req, res) => {
@@ -530,12 +591,12 @@ app.get('/chat/friend/:userId', requireAuth, (req, res) => {
   res.render('chat', { mode: 'friend', other, nickname, groupId: null, messages, meId: u.id });
 });
 
-app.post('/api/messages/send', requireAuth, (req, res) => {
+app.post('/api/messages/send', requireAuth, upload.single('media'), async (req, res) => {
   const u = res.locals.me;
   const content = (req.body.content || '').trim().slice(0, 2000);
-  if (!content) return res.status(400).json({ error: 'Message vide.' });
   const recipientId = req.body.recipient_id ? parseInt(req.body.recipient_id, 10) : null;
   const groupId = req.body.group_id ? parseInt(req.body.group_id, 10) : null;
+  if (!content && !req.file) return res.status(400).json({ error: 'Message vide.' });
   if (recipientId) {
     if (!areFriends(u.id, recipientId)) return res.status(403).json({ error: 'Vous devez être amis pour vous écrire.' });
   } else if (groupId) {
@@ -543,11 +604,59 @@ app.post('/api/messages/send', requireAuth, (req, res) => {
   } else {
     return res.status(400).json({ error: 'Destinataire manquant.' });
   }
-  const info = db.prepare('INSERT INTO messages (sender_id, recipient_id, group_id, content, created_at) VALUES (?,?,?,?,?)').run(u.id, recipientId, groupId, content, Date.now());
-  res.json({ ok: true, id: info.lastInsertRowid, created_at: Date.now() });
+
+  let mediaKey = '', mediaMime = '', mediaName = '', mediaSize = 0;
+  if (req.file) {
+    const fresh = db.prepare('SELECT storage_used, storage_quota FROM users WHERE id = ?').get(u.id);
+    if (fresh.storage_used + req.file.size > fresh.storage_quota) return res.status(413).json({ error: 'quota', message: `Stockage plein : il ne te reste que ${fmtBytes(Math.max(0, fresh.storage_quota - fresh.storage_used))}.` });
+    if (!r2.R2_CONFIGURED) return res.status(500).json({ error: 'Le stockage n\'est pas configuré sur ce serveur.' });
+    try {
+      mediaName = Buffer.from(req.file.originalname, 'latin1').toString('utf8').slice(0, 200);
+      mediaKey = r2.makeR2Key(u.id, mediaName);
+      await r2.uploadBuffer(mediaKey, req.file.buffer, req.file.mimetype);
+      mediaMime = req.file.mimetype || ''; mediaSize = req.file.size;
+      db.prepare('UPDATE users SET storage_used = storage_used + ? WHERE id = ?').run(mediaSize, u.id);
+    } catch (e) {
+      console.error('[chat media]', e);
+      return res.status(500).json({ error: 'Échec de l\'envoi du fichier.' });
+    }
+  }
+
+  const now = Date.now();
+  const info = db.prepare('INSERT INTO messages (sender_id, recipient_id, group_id, content, media_key, media_mime, media_name, media_size, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+    .run(u.id, recipientId, groupId, content, mediaKey, mediaMime, mediaName, mediaSize, now);
+
+  if (recipientId) {
+    notify(recipientId, 'message', u.id, { username: u.username, preview: content ? content.slice(0, 60) : (mediaMime.startsWith('image/') ? '📷 Photo' : mediaMime.startsWith('video/') ? '🎬 Vidéo' : '📄 Fichier') });
+  } else if (groupId) {
+    const group = db.prepare('SELECT name FROM groups_ WHERE id = ?').get(groupId);
+    const others = db.prepare('SELECT user_id FROM group_members WHERE group_id = ? AND user_id != ?').all(groupId, u.id);
+    others.forEach(m => notify(m.user_id, 'message', u.id, { username: u.username, group: group ? group.name : '', preview: content ? content.slice(0, 60) : '📎 Fichier' }));
+  }
+
+  res.json({
+    ok: true, id: info.lastInsertRowid, created_at: now,
+    media: mediaKey ? { mime: mediaMime, name: mediaName, size: mediaSize, id: info.lastInsertRowid } : null
+  });
 });
 
 // Sondage des nouveaux messages (rafraichissement simple, sans websocket)
+// Acces au media d'un message (verifie que l'utilisateur fait bien partie de la conversation)
+app.get('/api/messages/:id/media', requireAuth, async (req, res) => {
+  const u = res.locals.me;
+  const msg = db.prepare('SELECT * FROM messages WHERE id = ?').get(req.params.id);
+  if (!msg || !msg.media_key) return res.status(404).end();
+  const authorized = msg.sender_id === u.id
+    || (msg.recipient_id && msg.recipient_id === u.id)
+    || (msg.group_id && isGroupMember(u.id, msg.group_id));
+  if (!authorized) return res.status(403).end();
+  try {
+    const inline = (msg.media_mime || '').match(/^(image|video)\//);
+    const url = inline ? await r2.signedPreviewUrl(msg.media_key) : await r2.signedDownloadUrl(msg.media_key, msg.media_name);
+    res.redirect(url);
+  } catch (e) { res.status(500).end(); }
+});
+
 app.get('/api/messages/poll', requireAuth, (req, res) => {
   const u = res.locals.me;
   const since = parseInt(req.query.since, 10) || 0;
@@ -622,10 +731,6 @@ module.exports = { app, PORT, requireAuth, ownFolder, fmtBytes, validUsername, c
 // ===========================================================================
 //  UPLOAD (vers Cloudflare R2, jamais de compression : qualite d'origine)
 // ===========================================================================
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 1024 * 1024 * 1024 } // 1 Go par fichier (limite technique, pas la limite de quota)
-});
 app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => {
   const u = res.locals.me;
   if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu.' });
@@ -794,15 +899,19 @@ app.post('/api/share/user', requireAuth, (req, res) => {
   const targetUsername = (req.body.username || '').trim().toLowerCase();
   const table = type === 'folder' ? 'folders' : 'files';
   const col = type === 'folder' ? 'folder_id' : 'file_id';
-  const owns = db.prepare(`SELECT 1 FROM ${table} WHERE id = ? AND user_id = ?`).get(id, u.id);
-  if (!owns) return res.status(404).json({ error: 'Introuvable.' });
-  const target = db.prepare('SELECT id, username FROM users WHERE username_lower = ?').get(targetUsername);
+  const item = db.prepare(`SELECT * FROM ${table} WHERE id = ? AND user_id = ?`).get(id, u.id);
+  if (!item) return res.status(404).json({ error: 'Introuvable.' });
+  const target = db.prepare('SELECT id, username, allow_stranger_shares FROM users WHERE username_lower = ?').get(targetUsername);
   if (!target) return res.status(404).json({ error: `Aucun utilisateur "${req.body.username}" trouvé.` });
   if (target.id === u.id) return res.status(400).json({ error: 'Tu ne peux pas te le partager à toi-même.' });
+  if (!target.allow_stranger_shares && !areFriends(u.id, target.id)) {
+    return res.status(403).json({ error: `@${target.username} n'accepte les partages que de ses amis.` });
+  }
   const already = db.prepare(`SELECT 1 FROM shares WHERE ${col} = ? AND user_id = ? AND shared_with_user_id = ? AND revoked_at = 0`).get(id, u.id, target.id);
   if (already) return res.json({ ok: true, username: target.username, already: true });
   const token = crypto.randomBytes(9).toString('base64url');
   db.prepare(`INSERT INTO shares (token, user_id, ${col}, shared_with_user_id, created_at) VALUES (?,?,?,?,?)`).run(token, u.id, id, target.id, Date.now());
+  notify(target.id, 'share', u.id, { username: u.username, name: item.name, type });
   res.json({ ok: true, username: target.username });
 });
 
@@ -837,9 +946,10 @@ app.get('/friends', requireAuth, (req, res) => {
 app.post('/api/friends/request', requireAuth, (req, res) => {
   const u = res.locals.me;
   const username = (req.body.username || '').trim().toLowerCase();
-  const target = db.prepare('SELECT id, username FROM users WHERE username_lower = ?').get(username);
+  const target = db.prepare('SELECT id, username, allow_stranger_requests FROM users WHERE username_lower = ?').get(username);
   if (!target) return res.status(404).json({ error: `Aucun utilisateur "${req.body.username}" trouvé.` });
   if (target.id === u.id) return res.status(400).json({ error: 'Tu ne peux pas t\'ajouter toi-même.' });
+  if (!target.allow_stranger_requests) return res.status(403).json({ error: `@${target.username} n'accepte pas de nouvelles demandes d'ami pour le moment.` });
   const [a, b] = pair(u.id, target.id);
   const existing = db.prepare('SELECT * FROM friendships WHERE user_a = ? AND user_b = ?').get(a, b);
   if (existing) {
@@ -847,6 +957,7 @@ app.post('/api/friends/request', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Une demande est déjà en attente entre vous.' });
   }
   db.prepare('INSERT INTO friendships (user_a, user_b, status, requested_by, created_at) VALUES (?,?,?,?,?)').run(a, b, 'pending', u.id, Date.now());
+  notify(target.id, 'friend_request', u.id, { username: u.username });
   res.json({ ok: true, username: target.username });
 });
 

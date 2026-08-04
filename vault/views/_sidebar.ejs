@@ -35,7 +35,15 @@
     </div>
   <% } %>
 
-  <div class="sidebar-foot">
+  <div class="sidebar-foot" style="position:relative">
+    <button type="button" class="icon-btn" id="notifBell" title="Notifications" style="position:relative">
+      <%- icon('bell') %>
+      <span class="notif-badge" id="notifBadge" hidden>0</span>
+    </button>
+    <div class="notif-panel" id="notifPanel">
+      <div class="notif-panel-head">Notifications</div>
+      <div class="notif-list" id="notifList"><div class="notif-empty">Chargement...</div></div>
+    </div>
     <a class="avatar" href="/account" title="Mon compte" style="<%= me.avatar_key ? 'background-image:url(/api/avatar/'+me.id+');background-size:cover' : '' %>"><%= me.avatar_key ? '' : me.username.slice(0,1).toUpperCase() %></a>
     <a href="/settings" class="icon-btn" title="Réglages"><%- icon('settings') %></a>
     <form method="POST" action="/logout" style="flex:1">

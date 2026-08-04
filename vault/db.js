@@ -74,6 +74,15 @@ addCol('reset_expires',    "INTEGER DEFAULT 0");
 addCol('theme',             "TEXT DEFAULT 'dark'");
 addCol('quota_request_at', "INTEGER DEFAULT 0"); // horodatage de la derniere demande de plus de stockage
 addCol('bio', "TEXT DEFAULT ''");
+// --- Confidentialite ---
+addCol('allow_stranger_requests', "INTEGER DEFAULT 1"); // accepter les demandes d'ami de n'importe qui
+addCol('allow_stranger_shares',   "INTEGER DEFAULT 1"); // accepter un partage direct de quelqu'un qui n'est pas encore ami
+// --- Notifications (chacune activable independamment) ---
+addCol('notify_friend_request', "INTEGER DEFAULT 1");
+addCol('notify_share',          "INTEGER DEFAULT 1");
+addCol('notify_message',        "INTEGER DEFAULT 1");
+// --- Preferences d'affichage ---
+addCol('default_view', "TEXT DEFAULT 'grid'"); // 'grid' ou 'list'
 addCol('avatar_key', "TEXT DEFAULT ''"); // cle R2 de la photo de profil (vide = aucune)
 
 // Migration equivalente pour la table shares (partage direct entre utilisateurs)
@@ -130,5 +139,27 @@ CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at);
 const friendCols = db.prepare("PRAGMA table_info(friendships)").all().map(c => c.name);
 if (!friendCols.includes('nickname_by_a')) db.exec('ALTER TABLE friendships ADD COLUMN nickname_by_a TEXT');
 if (!friendCols.includes('nickname_by_b')) db.exec('ALTER TABLE friendships ADD COLUMN nickname_by_b TEXT');
+
+// Medias (photo/video/document) dans les messages
+const msgCols = db.prepare("PRAGMA table_info(messages)").all().map(c => c.name);
+const addMsgCol = (name, def) => { if (!msgCols.includes(name)) db.exec(`ALTER TABLE messages ADD COLUMN ${name} ${def}`); };
+addMsgCol('media_key',  "TEXT DEFAULT ''");
+addMsgCol('media_mime', "TEXT DEFAULT ''");
+addMsgCol('media_name', "TEXT DEFAULT ''");
+addMsgCol('media_size', "INTEGER DEFAULT 0");
+
+// Notifications
+db.exec(`
+CREATE TABLE IF NOT EXISTS notifications (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL,   -- le destinataire de la notification
+  type       TEXT NOT NULL,      -- 'friend_request' | 'share' | 'message'
+  actor_id   INTEGER NOT NULL,   -- qui a declenche la notification
+  data       TEXT DEFAULT '',    -- infos complementaires en JSON (ex: nom du fichier partage)
+  read_at    INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read_at, created_at);
+`);
 
 module.exports = db;

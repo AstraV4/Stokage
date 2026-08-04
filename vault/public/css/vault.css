@@ -27,6 +27,23 @@
 .icon-btn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9px;border:none;background:transparent;color:var(--dim);cursor:pointer;transition:.12s}
 .icon-btn:hover{background:rgba(255,255,255,.06);color:var(--text)}
 
+.notif-badge{position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:700;min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1}
+.notif-panel{position:absolute;bottom:calc(100% + 8px);left:0;width:320px;max-height:420px;background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 25px 50px rgba(0,0,0,.5);display:none;flex-direction:column;z-index:200;overflow:hidden}
+.notif-panel.show{display:flex;animation:notifIn .18s ease}
+@keyframes notifIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.notif-panel-head{padding:14px 16px;font-weight:700;font-size:.85rem;border-bottom:1px solid var(--border)}
+.notif-list{overflow-y:auto;max-height:360px}
+.notif-empty{padding:30px 16px;text-align:center;color:var(--dim);font-size:.82rem}
+.notif-item{display:flex;gap:11px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:.12s}
+.notif-item:last-child{border-bottom:none}
+.notif-item:hover{background:var(--panel-2)}
+.notif-item.unread{background:rgba(59,130,246,.06)}
+.notif-item .ni-av{width:34px;height:34px;border-radius:50%;background:var(--accent-2);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;flex:none;background-size:cover;background-position:center}
+.notif-item .ni-txt{flex:1;min-width:0;font-size:.8rem;line-height:1.4}
+.notif-item .ni-txt b{font-weight:700}
+.notif-item .ni-time{font-size:.68rem;color:var(--dim);margin-top:2px}
+
 .quota{margin-top:18px;padding:14px;background:var(--panel-2);border-radius:12px;border:1px solid var(--border)}
 .quota .qlabel{font-size:.72rem;color:var(--dim);margin-bottom:8px;display:flex;justify-content:space-between}
 .quota .qtrack{height:6px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;margin-bottom:8px}

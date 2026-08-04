@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0a0a0a" />
+<title>Réglages · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css?v=9" />
+<link rel="stylesheet" href="/static/css/vault.css?v=9" />
+<style>
+  .set-wrap{max-width:680px;margin:0 auto;padding:40px 22px 70px}
+  .set-top{display:flex;align-items:center;gap:14px;margin-bottom:32px}
+  .set-back{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--dim);flex:none;transition:.15s}
+  .set-back:hover{background:var(--panel-2);color:var(--text)}
+  .set-back svg{width:18px;height:18px}
+  .set-top h1{font-size:1.4rem;font-weight:700;letter-spacing:-.01em}
+
+  .set-nav{display:flex;gap:6px;margin-bottom:28px;overflow-x:auto;padding-bottom:2px}
+  .set-nav button{background:none;border:none;color:var(--dim);padding:8px 4px;font-size:.85rem;font-weight:600;cursor:pointer;position:relative;white-space:nowrap;font-family:inherit}
+  .set-nav button + button{margin-left:18px}
+  .set-nav button.active{color:var(--text)}
+  .set-nav button.active::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--accent);border-radius:2px}
+
+  .set-section{display:none;animation:setFadeIn .35s ease both}
+  .set-section.active{display:block}
+  @keyframes setFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .set-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:16px;opacity:0;animation:cardIn .4s ease forwards}
+  .set-card:nth-of-type(1){animation-delay:.02s}
+  .set-card:nth-of-type(2){animation-delay:.07s}
+  .set-card:nth-of-type(3){animation-delay:.12s}
+  @keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .set-card h3{font-size:.92rem;font-weight:700;margin-bottom:3px}
+  .set-card .set-desc{font-size:.78rem;color:var(--dim);margin-bottom:18px}
+
+  .set-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-top:1px solid var(--border)}
+  .set-row:first-of-type{border-top:none;padding-top:0}
+  .set-row-txt b{display:block;font-size:.85rem;font-weight:600}
+  .set-row-txt span{font-size:.76rem;color:var(--dim)}
+
+  /* Interrupteur anime */
+  .switch{position:relative;width:44px;height:26px;flex:none;cursor:pointer}
+  .switch input{position:absolute;opacity:0;width:0;height:0}
+  .switch .track{position:absolute;inset:0;background:var(--panel-2);border:1px solid var(--border);border-radius:20px;transition:.25s cubic-bezier(.4,0,.2,1)}
+  .switch .knob{position:absolute;width:18px;height:18px;left:3px;top:3px;background:var(--dim);border-radius:50%;transition:.25s cubic-bezier(.4,0,.2,1)}
+  .switch input:checked + .track{background:var(--accent);border-color:var(--accent)}
+  .switch input:checked + .track + .knob{transform:translateX(18px);background:var(--accent-ink)}
+  .switch:active .knob{width:21px}
+
+  /* Cartes de theme */
+  .theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .theme-opt{border:2px solid var(--border);border-radius:14px;padding:10px;cursor:pointer;text-align:center;transition:.18s}
+  .theme-opt:hover{border-color:var(--dim)}
+  .theme-opt.active{border-color:var(--accent)}
+  .theme-opt .sw{height:44px;border-radius:9px;margin-bottom:9px}
+  .theme-opt span{font-size:.78rem;font-weight:600}
+
+  .view-grid{display:flex;gap:12px}
+  .view-opt{flex:1;border:2px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;text-align:center;transition:.18s}
+  .view-opt:hover{border-color:var(--dim)}
+  .view-opt.active{border-color:var(--accent)}
+  .view-opt svg{width:26px;height:26px;margin-bottom:8px;color:var(--dim)}
+  .view-opt.active svg{color:var(--text)}
+  .view-opt span{display:block;font-size:.82rem;font-weight:600}
+
+  .set-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--border);color:var(--text);
+    padding:12px 22px;border-radius:12px;font-size:.85rem;font-weight:600;box-shadow:0 20px 40px rgba(0,0,0,.4);opacity:0;transition:.3s;pointer-events:none;display:flex;align-items:center;gap:8px}
+  .set-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .set-toast svg{width:16px;height:16px;color:var(--ok)}
+</style>
+</head>
+<body data-theme="<%= u.theme || 'dark' %>">
+  <div class="set-wrap">
+    <div class="set-top">
+      <a class="set-back" href="/"><%- icon('chevron-left') %></a>
+      <h1>Réglages</h1>
+    </div>
+
+    <div class="set-nav">
+      <button class="active" data-tab="compte">Compte</button>
+      <button data-tab="confidentialite">Confidentialité</button>
+      <button data-tab="notifications">Notifications</button>
+      <button data-tab="apparence">Apparence</button>
+      <button data-tab="affichage">Affichage</button>
+    </div>
+
+    <!-- ===== Compte ===== -->
+    <div class="set-section active" id="tab-compte">
+      <div class="set-card">
+        <h3>Informations du compte</h3>
+        <p class="set-desc">Ton identité sur <%= siteName %>.</p>
+        <div class="set-row"><div class="set-row-txt"><b>Pseudo</b><span>@<%= u.username %></span></div></div>
+        <div class="set-row"><div class="set-row-txt"><b>E-mail</b><span><%= u.email || 'Non renseigné' %></span></div></div>
+        <div class="set-row"><div class="set-row-txt"><b>Membre depuis</b><span><%= new Date(u.created_at).toLocaleDateString('fr-FR', { year:'numeric', month:'long', day:'numeric' }) %></span></div></div>
+      </div>
+      <div class="set-card">
+        <h3>Profil public</h3>
+        <p class="set-desc">Photo de profil et biographie, modifiables ici.</p>
+        <a class="btn btn-ghost" href="/account">Gérer mon profil →</a>
+      </div>
+      <div class="set-card">
+        <h3 style="color:#fca5a5">Zone sensible</h3>
+        <p class="set-desc">Mot de passe et déconnexion.</p>
+        <div style="display:flex;gap:10px">
+          <a class="btn btn-ghost" href="/account" style="flex:1">Changer le mot de passe</a>
+          <form method="POST" action="/logout" style="flex:1"><button class="btn btn-ghost" type="submit" style="width:100%">Déconnexion</button></form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Confidentialite ===== -->
+    <div class="set-section" id="tab-confidentialite">
+      <form class="set-card" id="privacyForm">
+        <h3>Qui peut t'ajouter ou te partager des fichiers</h3>
+        <p class="set-desc">Contrôle qui peut t'envoyer une demande ou un fichier sans être déjà ton ami.</p>
+        <div class="set-row">
+          <div class="set-row-txt"><b>Demandes d'ami</b><span>Autoriser n'importe qui à t'envoyer une demande d'ami</span></div>
+          <label class="switch"><input type="checkbox" name="allow_stranger_requests" <%= u.allow_stranger_requests ? 'checked' : '' %> /><span class="track"></span><span class="knob"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-row-txt"><b>Partages</b><span>Autoriser n'importe qui à te partager un fichier ou un dossier</span></div>
+          <label class="switch"><input type="checkbox" name="allow_stranger_shares" <%= u.allow_stranger_shares ? 'checked' : '' %> /><span class="track"></span><span class="knob"></span></label>
+        </div>
+      </form>
+    </div>
+
+    <!-- ===== Notifications ===== -->
+    <div class="set-section" id="tab-notifications">
+      <form class="set-card" id="notifForm">
+        <h3>Ce qui déclenche une notification</h3>
+        <p class="set-desc">Désactive ce que tu ne veux plus voir apparaître.</p>
+        <div class="set-row">
+          <div class="set-row-txt"><b>Demandes d'ami</b><span>Quand quelqu'un veut t'ajouter</span></div>
+          <label class="switch"><input type="checkbox" name="notify_friend_request" <%= u.notify_friend_request ? 'checked' : '' %> /><span class="track"></span><span class="knob"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-row-txt"><b>Partages</b><span>Quand on te partage un fichier</span></div>
+          <label class="switch"><input type="checkbox" name="notify_share" <%= u.notify_share ? 'checked' : '' %> /><span class="track"></span><span class="knob"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-row-txt"><b>Messages</b><span>Quand tu reçois un message</span></div>
+          <label class="switch"><input type="checkbox" name="notify_message" <%= u.notify_message ? 'checked' : '' %> /><span class="track"></span><span class="knob"></span></label>
+        </div>
+      </form>
+    </div>
+
+    <!-- ===== Apparence ===== -->
+    <div class="set-section" id="tab-apparence">
+      <form class="set-card" id="themeForm">
+        <h3>Thème</h3>
+        <p class="set-desc">Change l'apparence de tout le site.</p>
+        <input type="hidden" name="theme" id="themeInput" value="<%= u.theme || 'dark' %>" />
+        <div class="theme-grid">
+          <div class="theme-opt <%= (u.theme||'dark')==='dark'?'active':'' %>" data-theme="dark"><div class="sw" style="background:linear-gradient(135deg,#0a0a0a,#1a1a1a)"></div><span>Sombre</span></div>
+          <div class="theme-opt <%= u.theme==='light'?'active':'' %>" data-theme="light"><div class="sw" style="background:linear-gradient(135deg,#fafaf9,#ffffff);border:1px solid #e8e6e2"></div><span>Clair</span></div>
+          <div class="theme-opt <%= u.theme==='violet'?'active':'' %>" data-theme="violet"><div class="sw" style="background:linear-gradient(135deg,#181026,#2c2040)"></div><span>Violet</span></div>
+        </div>
+      </form>
+    </div>
+
+    <!-- ===== Affichage ===== -->
+    <div class="set-section" id="tab-affichage">
+      <form class="set-card" id="viewForm">
+        <h3>Vue par défaut des fichiers</h3>
+        <p class="set-desc">Comment tes fichiers s'affichent à l'ouverture.</p>
+        <input type="hidden" name="default_view" id="viewInput" value="<%= u.default_view || 'grid' %>" />
+        <div class="view-grid">
+          <div class="view-opt <%= (u.default_view||'grid')==='grid'?'active':'' %>" data-view="grid">
+            <%- icon('grid') %><span>Grille</span>
+          </div>
+          <div class="view-opt <%= u.default_view==='list'?'active':'' %>" data-view="list">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Liste</span>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="set-toast" id="setToast"><%- icon('check') %> Enregistré</div>
+
+<script>
+document.querySelectorAll('.set-nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.set-nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.set-section').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+function showSaved() {
+  const t = document.getElementById('setToast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+async function autoSave(form, url) {
+  const fd = new FormData(form);
+  await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams([...fd.entries()]) });
+  showSaved();
+}
+
+document.querySelectorAll('#privacyForm input, #notifForm input').forEach(input => {
+  input.addEventListener('change', () => {
+    const form = input.closest('form');
+    autoSave(form, form.id === 'privacyForm' ? '/settings/privacy' : '/settings/notifications');
+  });
+});
+
+document.querySelectorAll('.theme-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.theme-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    document.getElementById('themeInput').value = opt.dataset.theme;
+    document.body.setAttribute('data-theme', opt.dataset.theme);
+    autoSave(document.getElementById('themeForm'), '/settings/theme');
+  });
+});
+
+document.querySelectorAll('.view-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.view-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    document.getElementById('viewInput').value = opt.dataset.view;
+    autoSave(document.getElementById('viewForm'), '/settings/display');
+  });
+});
+</script>
+</body>
+</html>

@@ -5,6 +5,7 @@
 <title>Partagés avec moi · <%= siteName %></title>
 <link rel="stylesheet" href="/static/css/app.css?v=8" />
 <link rel="stylesheet" href="/static/css/vault.css?v=8" />
+<link rel="stylesheet" href="/static/css/social.css?v=8" />
 </head>
 <body data-theme="<%= me.theme || 'dark' %>">
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -44,7 +45,8 @@
     </div>
   </div>
   <div class="toast" id="toast"></div>
-  <script>
+  <script src="/static/js/social.js?v=8"></script>
+<script>
     const sidebar = document.getElementById('sidebar'), sidebarOverlay = document.getElementById('sidebarOverlay'), menuToggle = document.getElementById('menuToggle');
     if (menuToggle) menuToggle.addEventListener('click', () => { sidebar.classList.add('open'); sidebarOverlay.classList.add('show'); });
     if (sidebarOverlay) sidebarOverlay.addEventListener('click', () => { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('show'); });
