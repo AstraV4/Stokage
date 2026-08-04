@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>@<%= target.username %> · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<style>
+  .profile-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .profile-card{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:30px;text-align:center}
+  .profile-av{width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#f472b6,#8b5cf6);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;color:#fff;background-size:cover;background-position:center}
+  .profile-card h2{font-size:1.2rem;margin-bottom:4px}
+  .profile-bio{color:var(--dim);font-size:.88rem;margin:10px 0 16px;line-height:1.5;white-space:pre-wrap}
+  .profile-meta{font-size:.76rem;color:var(--dim);margin-bottom:20px}
+  .profile-back{display:inline-block;margin-top:10px;font-size:.82rem;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="profile-wrap">
+  <div class="profile-card">
+    <div class="profile-av" style="<%= target.avatar_key ? 'background-image:url(/api/avatar/'+target.id+')' : '' %>">
+      <%= target.avatar_key ? '' : target.username.slice(0,1).toUpperCase() %>
+    </div>
+    <h2>@<%= target.username %></h2>
+    <div class="profile-meta">Membre depuis <%= new Date(target.created_at).toLocaleDateString('fr-FR', { year:'numeric', month:'long' }) %></div>
+    <% if (target.bio) { %><div class="profile-bio"><%= target.bio %></div><% } %>
+
+    <% if (isSelf) { %>
+      <a class="btn btn-ghost" href="/account">Modifier mon profil</a>
+    <% } else if (friendStatus === 'accepted') { %>
+      <div class="acc-notice" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#86efac;padding:10px 14px;border-radius:9px;font-size:.82rem">✅ Vous êtes amis</div>
+    <% } else if (friendStatus === 'pending') { %>
+      <div class="acc-notice" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd;padding:10px 14px;border-radius:9px;font-size:.82rem">Demande d'ami en attente</div>
+    <% } else { %>
+      <button class="btn" type="button" id="addFriendBtn" data-username="<%= target.username %>">＋ Ajouter en ami</button>
+    <% } %>
+    <br/><a class="profile-back" href="/friends">← Retour aux amis</a>
+  </div>
+</div>
+<script>
+const btn = document.getElementById('addFriendBtn');
+if (btn) btn.addEventListener('click', async () => {
+  const r = await fetch('/api/friends/request', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username: btn.dataset.username }) });
+  if (r.ok) location.reload(); else { const d = await r.json(); alert(d.error || 'Erreur'); }
+});
+</script>
+</body>
+</html>

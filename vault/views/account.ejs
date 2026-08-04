@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/static/css/app.css" />
 <link rel="stylesheet" href="/static/css/vault.css" />
 <style>
+  .profile-av-big{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#f472b6,#8b5cf6);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:700;color:#fff;background-size:cover;background-position:center}
   .acc-wrap{max-width:640px;margin:0 auto;padding:36px 20px}
   .acc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px}
   .acc-top h1{font-size:1.3rem;font-weight:800}
@@ -26,6 +27,31 @@
     <div class="acc-top">
       <h1>Mon compte</h1>
       <a class="acc-back" href="/">← Retour à mes fichiers</a>
+    </div>
+
+    <div class="acc-card" style="text-align:center">
+      <% if (avatarok) { %><div class="acc-notice">✅ Photo de profil mise à jour.</div><% } %>
+      <% if (avatarerr === '1') { %><div class="error">Choisis une image.</div><% } %>
+      <% if (avatarerr === '2') { %><div class="error">Le stockage n'est pas configuré sur ce serveur.</div><% } %>
+      <div class="profile-av-big" id="avatarPreview" style="<%= u.avatar_key ? 'background-image:url(/api/avatar/'+u.id+')' : '' %>">
+        <%= u.avatar_key ? '' : u.username.slice(0,1).toUpperCase() %>
+      </div>
+      <h2 style="font-size:1.15rem;margin-bottom:2px">@<%= u.username %></h2>
+      <div style="color:var(--dim);font-size:.8rem;margin-bottom:16px">Membre depuis <%= new Date(u.created_at).toLocaleDateString('fr-FR', { year:'numeric', month:'long' }) %></div>
+      <form method="POST" action="/account/avatar" enctype="multipart/form-data" id="avatarForm">
+        <input type="file" name="avatar" accept="image/*" id="avatarInput" hidden />
+        <button class="btn btn-ghost" type="button" id="avatarBtn">📷 Changer la photo de profil</button>
+      </form>
+      <a class="profile-back" href="/u/<%= u.username %>" style="display:block;margin-top:10px;font-size:.8rem;color:var(--dim)">Voir mon profil public →</a>
+    </div>
+
+    <div class="acc-card">
+      <h3>📝 Biographie</h3>
+      <% if (typeof bioOk !== 'undefined' && bioOk) { %><div class="acc-notice">✅ Bio enregistrée.</div><% } %>
+      <form method="POST" action="/account/bio">
+        <textarea name="bio" rows="3" maxlength="280" placeholder="Dis-en un peu plus sur toi... (visible sur ton profil public)" style="width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:inherit;font-size:.88rem;resize:vertical"><%= u.bio || '' %></textarea>
+        <button class="btn" type="submit" style="margin-top:10px">Enregistrer la bio</button>
+      </form>
     </div>
 
     <div class="acc-card">
@@ -75,6 +101,8 @@
   </div>
 
 <script>
+document.getElementById('avatarBtn').addEventListener('click', () => document.getElementById('avatarInput').click());
+document.getElementById('avatarInput').addEventListener('change', () => document.getElementById('avatarForm').submit());
 document.querySelectorAll('.theme-opt').forEach(function(opt){
   opt.addEventListener('click', function(){
     document.querySelectorAll('.theme-opt').forEach(function(o){ o.classList.remove('active'); });

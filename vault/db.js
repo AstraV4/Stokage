@@ -73,11 +73,62 @@ addCol('reset_token',      "TEXT DEFAULT ''");
 addCol('reset_expires',    "INTEGER DEFAULT 0");
 addCol('theme',             "TEXT DEFAULT 'dark'");
 addCol('quota_request_at', "INTEGER DEFAULT 0"); // horodatage de la derniere demande de plus de stockage
+addCol('bio', "TEXT DEFAULT ''");
+addCol('avatar_key', "TEXT DEFAULT ''"); // cle R2 de la photo de profil (vide = aucune)
 
 // Migration equivalente pour la table shares (partage direct entre utilisateurs)
 const shareCols = db.prepare("PRAGMA table_info(shares)").all().map(c => c.name);
 if (!shareCols.includes('shared_with_user_id')) db.exec('ALTER TABLE shares ADD COLUMN shared_with_user_id INTEGER');
 db.exec('CREATE INDEX IF NOT EXISTS idx_shares_shared_with ON shares(shared_with_user_id)');
 db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users(email_lower) WHERE email_lower != ''");
+
+// ---------------------------------------------------------------------------
+// Amis, groupes, messagerie
+// ---------------------------------------------------------------------------
+db.exec(`
+CREATE TABLE IF NOT EXISTS friendships (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_a       INTEGER NOT NULL,   -- toujours le plus petit id des deux (evite les doublons a-b / b-a)
+  user_b       INTEGER NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending',  -- 'pending' ou 'accepted'
+  requested_by INTEGER NOT NULL,   -- qui a envoye la demande (pour savoir qui doit l'accepter)
+  created_at   INTEGER NOT NULL,
+  UNIQUE(user_a, user_b)
+);
+
+CREATE TABLE IF NOT EXISTS groups_ (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,
+  owner_id   INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  group_id  INTEGER NOT NULL,
+  user_id   INTEGER NOT NULL,
+  joined_at INTEGER NOT NULL,
+  PRIMARY KEY (group_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  sender_id    INTEGER NOT NULL,
+  recipient_id INTEGER,     -- renseigne pour un message prive (a un ami)
+  group_id     INTEGER,     -- renseigne pour un message de groupe (jamais les deux a la fois)
+  content      TEXT NOT NULL,
+  created_at   INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_friendships_a ON friendships(user_a, status);
+CREATE INDEX IF NOT EXISTS idx_friendships_b ON friendships(user_b, status);
+CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_dm ON messages(sender_id, recipient_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at);
+`);
+
+// Migration defensive (au cas ou friendships aurait deja ete deployee sans ces colonnes)
+const friendCols = db.prepare("PRAGMA table_info(friendships)").all().map(c => c.name);
+if (!friendCols.includes('nickname_by_a')) db.exec('ALTER TABLE friendships ADD COLUMN nickname_by_a TEXT');
+if (!friendCols.includes('nickname_by_b')) db.exec('ALTER TABLE friendships ADD COLUMN nickname_by_b TEXT');
 
 module.exports = db;

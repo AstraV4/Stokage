@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Amis · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+<style>
+  .friend-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:8px}
+  .friend-av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#f472b6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+  .friend-name{flex:1;font-weight:600;font-size:.88rem}
+  .friend-actions{display:flex;gap:6px}
+  .friend-actions button{padding:6px 12px;font-size:.78rem;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);cursor:pointer}
+  .friend-actions button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .add-friend-row{display:flex;gap:8px;margin-bottom:26px}
+  .add-friend-row input{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text)}
+  .add-friend-row button{background:var(--accent);border:none;color:#fff;padding:0 18px;border-radius:10px;font-weight:700}
+</style>
+</head>
+<body data-theme="<%= me.theme || 'dark' %>">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><img class="logo" src="/static/img/logo.png" alt="" /> <%= siteName %></div>
+      <div class="new-btn"><button type="button" disabled style="opacity:.4;cursor:default">＋ Nouveau</button></div>
+      <nav class="nav">
+        <a href="/"><span class="ic">🗂️</span> Mes fichiers</a>
+        <a href="/shared-with-me"><span class="ic">🤝</span> Partagés avec moi</a>
+        <a href="/friends" class="active"><span class="ic">👥</span> Amis</a>
+        <a href="/groups"><span class="ic">💬</span> Groupes</a>
+        <a href="/trash"><span class="ic">🗑️</span> Corbeille</a>
+      </nav>
+      <a class="btn-ghost btn" href="/account" style="margin-top:auto;padding:9px;text-align:center">Mon compte</a>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="menu-toggle" type="button" id="menuToggle">☰</button>
+        <div class="breadcrumb"><span>👥 Amis</span></div>
+      </div>
+      <div class="content" style="max-width:560px">
+        <% if (error) { %><div class="error" style="margin-bottom:16px"><%= error %></div><% } %>
+
+        <div class="add-friend-row">
+          <input type="text" id="addFriendInput" placeholder="Pseudo de la personne à ajouter" />
+          <button type="button" id="addFriendBtn">Ajouter</button>
+        </div>
+
+        <% if (incoming.length) { %>
+          <div class="section-label">Demandes reçues</div>
+          <% incoming.forEach(function(f){ %>
+            <div class="friend-row">
+              <div class="friend-av"><%= f.username.slice(0,1).toUpperCase() %></div>
+              <div class="friend-name">@<%= f.username %></div>
+              <div class="friend-actions">
+                <button class="primary" data-act="accept" data-id="<%= f.friendship_id %>">Accepter</button>
+                <button data-act="decline" data-id="<%= f.friendship_id %>">Refuser</button>
+              </div>
+            </div>
+          <% }) %>
+        <% } %>
+
+        <% if (outgoing.length) { %>
+          <div class="section-label" style="margin-top:22px">Demandes envoyées</div>
+          <% outgoing.forEach(function(f){ %>
+            <div class="friend-row">
+              <div class="friend-av"><%= f.username.slice(0,1).toUpperCase() %></div>
+              <div class="friend-name">@<%= f.username %> <span style="color:var(--dim);font-weight:400">— en attente</span></div>
+              <div class="friend-actions"><button data-act="decline" data-id="<%= f.friendship_id %>">Annuler</button></div>
+            </div>
+          <% }) %>
+        <% } %>
+
+        <div class="section-label" style="margin-top:22px">Mes amis (<%= accepted.length %>)</div>
+        <% accepted.forEach(function(f){ %>
+          <div class="friend-row">
+            <a class="friend-av" href="/u/<%= f.username %>" style="<%= f.avatar_key ? 'background-image:url(/api/avatar/'+f.id+');background-size:cover' : '' %>">
+              <%= f.avatar_key ? '' : f.username.slice(0,1).toUpperCase() %>
+            </a>
+            <a class="friend-name" href="/u/<%= f.username %>" style="color:inherit;text-decoration:none">
+              <%= f.nickname || ('@' + f.username) %>
+              <% if (f.nickname) { %><span style="color:var(--dim);font-weight:400;font-size:.78rem"> (@<%= f.username %>)</span><% } %>
+            </a>
+            <div class="friend-actions">
+              <button data-act="nickname" data-id="<%= f.id %>" data-current="<%= f.nickname || '' %>" title="Renommer">✏️</button>
+              <button data-act="remove" data-id="<%= f.id %>">Retirer</button>
+            </div>
+          </div>
+        <% }) %>
+        <% if (!accepted.length) { %><p style="color:var(--dim);font-size:.85rem">Tu n'as encore aucun ami sur <%= siteName %>.</p><% } %>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const sidebar = $('sidebar'), sidebarOverlay = $('sidebarOverlay'), menuToggle = $('menuToggle');
+if (menuToggle) menuToggle.addEventListener('click', () => { sidebar.classList.add('open'); sidebarOverlay.classList.add('show'); });
+if (sidebarOverlay) sidebarOverlay.addEventListener('click', () => { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('show'); });
+
+let toastTimer = null;
+function showToast(msg, isError) {
+  const t = $('toast'); t.textContent = msg; t.style.color = isError ? '#fca5a5' : '';
+  t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+$('addFriendBtn').addEventListener('click', async () => {
+  const input = $('addFriendInput'); const username = input.value.trim(); if (!username) return;
+  try {
+    const r = await fetch('/api/friends/request', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username }) });
+    const data = await r.json();
+    if (!r.ok) return showToast(data.error, true);
+    showToast('✅ Demande envoyée à @' + data.username);
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { showToast('Erreur réseau', true); }
+});
+
+document.querySelectorAll('[data-act]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const act = btn.dataset.act, id = btn.dataset.id;
+    if (act === 'nickname') {
+      const nickname = prompt('Surnom pour cette personne (laisse vide pour revenir à son pseudo) :', btn.dataset.current || '');
+      if (nickname === null) return;
+      await fetch('/api/friends/nickname', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ user_id: id, nickname }) });
+      return location.reload();
+    }
+    const url = act === 'remove' ? '/api/friends/remove' : (act === 'accept' ? '/api/friends/accept' : '/api/friends/decline');
+    const body = act === 'remove' ? { user_id: id } : { id };
+    await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body) });
+    location.reload();
+  });
+});
+</script>
+</body>
+</html>

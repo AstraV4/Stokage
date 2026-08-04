@@ -16,6 +16,11 @@ const r2 = require('./r2');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const app = express();
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8 Mo max pour une photo de profil
+  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype))
+});
 app.set('trust proxy', 1); // un seul niveau de proxy de confiance (celui de Railway) : empeche de falsifier son IP
 app.use(helmet({
   contentSecurityPolicy: false // desactive pour l'instant : evite de casser les styles/scripts en ligne existants
@@ -264,7 +269,9 @@ app.get('/account', requireAuth, (req, res) => {
     u, fmtBytes,
     pwok: req.query.pwok === '1', pwerr: req.query.pwerr || '',
     themeok: req.query.themeok === '1',
-    quotaSent: req.query.quotasent === '1'
+    quotaSent: req.query.quotasent === '1',
+    avatarok: req.query.avatarok === '1', avatarerr: req.query.avatarerr || '',
+    bioOk: req.query.bioOk === '1'
   });
 });
 app.post('/account/password', requireAuth, (req, res) => {
@@ -289,6 +296,61 @@ app.post('/account/request-quota', requireAuth, async (req, res) => {
       mailLayout('Demande de stockage', '<p>L\'utilisateur <b>' + u.username + '</b> (' + (u.email || 'pas d\'e-mail') + ') a demandé plus de stockage.</p><p>Utilisé actuellement : ' + fmtBytes(u.storage_used) + ' / ' + fmtBytes(u.storage_quota) + '</p>'));
   }
   res.redirect('/account?quotasent=1');
+});
+
+app.post('/account/bio', requireAuth, (req, res) => {
+  const bio = (req.body.bio || '').trim().slice(0, 280);
+  db.prepare('UPDATE users SET bio = ? WHERE id = ?').run(bio, req.session.userId);
+  res.redirect('/account?bioOk=1');
+});
+
+app.post('/account/avatar', requireAuth, avatarUpload.single('avatar'), async (req, res) => {
+  const u = res.locals.me;
+  if (!req.file) return res.redirect('/account?avatarerr=1');
+  if (!r2.R2_CONFIGURED) return res.redirect('/account?avatarerr=2');
+  try {
+    const oldRow = db.prepare('SELECT avatar_key FROM users WHERE id = ?').get(u.id);
+    const ext = (req.file.originalname.match(/\.[a-zA-Z0-9]{1,6}$/) || ['.jpg'])[0].toLowerCase();
+    const key = `avatars/u${u.id}-${crypto.randomBytes(8).toString('hex')}${ext}`;
+    await r2.uploadBuffer(key, req.file.buffer, req.file.mimetype);
+    db.prepare('UPDATE users SET avatar_key = ? WHERE id = ?').run(key, u.id);
+    if (oldRow && oldRow.avatar_key) { try { await r2.deleteObject(oldRow.avatar_key); } catch (e) {} }
+    res.redirect('/account?avatarok=1');
+  } catch (e) {
+    console.error('[avatar]', e);
+    res.redirect('/account?avatarerr=2');
+  }
+});
+
+// Photo de profil de n'importe quel utilisateur (soi-meme ou un autre) : lien signe genere a la demande
+app.get('/api/avatar/:userId', requireAuth, async (req, res) => {
+  const target = db.prepare('SELECT avatar_key FROM users WHERE id = ?').get(req.params.userId);
+  if (!target || !target.avatar_key || !r2.R2_CONFIGURED) return res.status(404).end();
+  try {
+    const url = await r2.signedPreviewUrl(target.avatar_key);
+    res.redirect(url);
+  } catch (e) { res.status(404).end(); }
+});
+
+// Profil public d'un utilisateur (visible par tout le monde connecte)
+app.get('/u/:username', requireAuth, (req, res) => {
+  const target = db.prepare('SELECT id, username, bio, avatar_key, created_at FROM users WHERE username_lower = ?').get(req.params.username.toLowerCase());
+  if (!target) return res.status(404).render('404');
+  const isSelf = target.id === req.session.userId;
+  const [a, b] = pair(req.session.userId, target.id);
+  const friendship = db.prepare('SELECT status FROM friendships WHERE user_a = ? AND user_b = ?').get(a, b);
+  res.render('profile', { target, isSelf, friendStatus: friendship ? friendship.status : 'none' });
+});
+
+app.post('/api/friends/nickname', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const otherId = parseInt(req.body.user_id, 10);
+  const nickname = (req.body.nickname || '').trim().slice(0, 40);
+  const [a, b] = pair(u.id, otherId);
+  const col = u.id === a ? 'nickname_by_a' : 'nickname_by_b';
+  const info = db.prepare(`UPDATE friendships SET ${col} = ? WHERE user_a = ? AND user_b = ? AND status = 'accepted'`).run(nickname || null, a, b);
+  if (info.changes === 0) return res.status(404).json({ error: 'Amitié introuvable.' });
+  res.json({ ok: true, nickname: nickname || null });
 });
 
 // ===========================================================================
@@ -352,7 +414,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 1024 * 1024 * 1024 } // 1 Go par fichier (limite technique, pas la limite de quota)
 });
-
 app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => {
   const u = res.locals.me;
   if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu.' });
@@ -534,6 +595,73 @@ app.post('/api/share/user', requireAuth, (req, res) => {
 });
 
 // Liste de ce que les autres ont partage directement avec moi
+// ===========================================================================
+//  AMIS
+// ===========================================================================
+function pair(a, b) { return a < b ? [a, b] : [b, a]; }
+app.get('/friends', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const accepted = db.prepare(`
+    SELECT usr.id, usr.username, usr.avatar_key,
+      (CASE WHEN f.user_a = ? THEN f.nickname_by_a ELSE f.nickname_by_b END) AS nickname
+    FROM friendships f
+    JOIN users usr ON usr.id = (CASE WHEN f.user_a = ? THEN f.user_b ELSE f.user_a END)
+    WHERE (f.user_a = ? OR f.user_b = ?) AND f.status = 'accepted'
+    ORDER BY usr.username COLLATE NOCASE
+  `).all(u.id, u.id, u.id, u.id);
+  const incoming = db.prepare(`
+    SELECT f.id AS friendship_id, usr.id, usr.username FROM friendships f
+    JOIN users usr ON usr.id = f.requested_by
+    WHERE (f.user_a = ? OR f.user_b = ?) AND f.status = 'pending' AND f.requested_by != ?
+  `).all(u.id, u.id, u.id);
+  const outgoing = db.prepare(`
+    SELECT f.id AS friendship_id, usr.id, usr.username FROM friendships f
+    JOIN users usr ON usr.id = (CASE WHEN f.user_a = ? THEN f.user_b ELSE f.user_a END)
+    WHERE (f.user_a = ? OR f.user_b = ?) AND f.status = 'pending' AND f.requested_by = ?
+  `).all(u.id, u.id, u.id, u.id);
+  res.render('friends', { accepted, incoming, outgoing, error: req.query.error || null });
+});
+
+app.post('/api/friends/request', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const username = (req.body.username || '').trim().toLowerCase();
+  const target = db.prepare('SELECT id, username FROM users WHERE username_lower = ?').get(username);
+  if (!target) return res.status(404).json({ error: `Aucun utilisateur "${req.body.username}" trouvé.` });
+  if (target.id === u.id) return res.status(400).json({ error: 'Tu ne peux pas t\'ajouter toi-même.' });
+  const [a, b] = pair(u.id, target.id);
+  const existing = db.prepare('SELECT * FROM friendships WHERE user_a = ? AND user_b = ?').get(a, b);
+  if (existing) {
+    if (existing.status === 'accepted') return res.status(400).json({ error: `Vous êtes déjà amis avec @${target.username}.` });
+    return res.status(400).json({ error: 'Une demande est déjà en attente entre vous.' });
+  }
+  db.prepare('INSERT INTO friendships (user_a, user_b, status, requested_by, created_at) VALUES (?,?,?,?,?)').run(a, b, 'pending', u.id, Date.now());
+  res.json({ ok: true, username: target.username });
+});
+
+app.post('/api/friends/accept', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const info = db.prepare(`
+    UPDATE friendships SET status = 'accepted'
+    WHERE id = ? AND (user_a = ? OR user_b = ?) AND requested_by != ? AND status = 'pending'
+  `).run(req.body.id, u.id, u.id, u.id);
+  if (info.changes === 0) return res.status(404).json({ error: 'Demande introuvable.' });
+  res.json({ ok: true });
+});
+
+app.post('/api/friends/decline', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  db.prepare('DELETE FROM friendships WHERE id = ? AND (user_a = ? OR user_b = ?)').run(req.body.id, u.id, u.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/friends/remove', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const otherId = parseInt(req.body.user_id, 10);
+  const [a, b] = pair(u.id, otherId);
+  db.prepare('DELETE FROM friendships WHERE user_a = ? AND user_b = ?').run(a, b);
+  res.json({ ok: true });
+});
+
 app.get('/shared-with-me', requireAuth, (req, res) => {
   const u = res.locals.me;
   const folders = db.prepare(`
