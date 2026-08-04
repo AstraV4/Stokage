@@ -83,6 +83,13 @@ function requireAuth(req, res, next) {
     if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'auth' });
     return res.redirect('/login');
   }
+  // Session presente mais utilisateur introuvable en base (ex: base reinitialisee, session obsolete)
+  // -> on nettoie la session au lieu de planter plus loin dans le code.
+  if (!res.locals.me) {
+    req.session.destroy(() => {});
+    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'auth' });
+    return res.redirect('/login');
+  }
   next();
 }
 function fmtBytes(n) {
