@@ -36,6 +36,47 @@ const authLimiter = rateLimit({
 const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 const PORT = process.env.PORT || 3000;
 const SITE_NAME = process.env.SITE_NAME || 'Vault';
+// ---------------------------------------------------------------------------
+// Icones SVG (trait fin, style coherent) — remplace tout usage d'emoji dans l'interface
+// ---------------------------------------------------------------------------
+const ICON_PATHS = {
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>',
+  'folder-plus': '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v4M10 13h4"/>',
+  share: '<circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
+  users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 8.2a3 3 0 1 1 0 5.9"/><path d="M21 20c0-2.6-1.8-4.8-4.2-5.6"/>',
+  'user-plus': '<circle cx="10" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6"/><path d="M19 8v6M16 11h6"/>',
+  message: '<path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/>',
+  grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/>',
+  trash: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m1 0v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V7z"/><path d="M10 11v5M14 11v5"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M3 12h2.2M18.8 12H21M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/>',
+  bell: '<path d="M6 10a6 6 0 1 1 12 0c0 3 1 4.5 1.5 5.5H4.5C5 14.5 6 13 6 10z"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M19 19l-4.3-4.3"/>',
+  upload: '<path d="M12 16V5M8 9l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+  download: '<path d="M12 4v11M8 11l4 4 4-4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+  more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+  image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 3.5 3.5L17 11l3 3"/>',
+  video: '<rect x="3.5" y="6" width="13" height="12" rx="2"/><path d="M16.5 10.5l4-2.3v7.6l-4-2.3"/>',
+  file: '<path d="M6 3.5h8l4 4V19a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M14 3.5V8h4"/>',
+  camera: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.2"/>',
+  shield: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>',
+  'chevron-left': '<path d="M15 5l-7 7 7 7"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  check: '<path d="M5 13l4 4L19 7"/>',
+  edit: '<path d="M4 16.5V20h3.5L18 9.5l-3.5-3.5L4 16.5z"/><path d="M14 6.5l3.5 3.5"/>',
+  'log-out': '<path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="M15 16l4-4-4-4"/><path d="M19 12H9"/>',
+  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
+  palette: '<path d="M12 3a9 8.5 0 1 0 0 17c1.4 0 2-1 2-2 0-.6-.3-1-.6-1.4-.3-.4-.5-.7-.5-1.2 0-.8.7-1.4 1.5-1.4H16a4 4 0 0 0 4-4c0-4-3.6-7-8-7z"/><circle cx="7.5" cy="11" r="1"/><circle cx="8.5" cy="7" r="1"/><circle cx="13" cy="6.5" r="1"/><circle cx="16.5" cy="9" r="1"/>',
+  home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/>',
+  crown: '<path d="M4 8l3.5 3L12 5l4.5 6L20 8l-1.5 9h-13z"/>',
+  paperclip: '<path d="M8 12.5l6-6a3 3 0 1 1 4.2 4.2l-8 8a4.5 4.5 0 1 1-6.4-6.4L11 5"/>'
+};
+function icon(name, cls) {
+  const body = ICON_PATHS[name] || '';
+  return `<svg class="ic-svg${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+}
+
 
 // --- E-mail (Resend) : verification d'adresse + reinitialisation de mot de passe ---
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
@@ -101,6 +142,7 @@ app.use((req, res, next) => {
     ? db.prepare('SELECT id, username, storage_used, storage_quota, theme FROM users WHERE id = ?').get(req.session.userId)
     : null;
   res.locals.siteName = SITE_NAME;
+  res.locals.icon = icon;
   next();
 });
 

@@ -19,7 +19,7 @@
       <div class="content" style="max-width:560px">
         <div class="add-friend-row" style="display:flex;gap:8px;margin-bottom:26px">
           <input type="text" id="newGroupInput" placeholder="Nom du nouveau groupe" style="flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text)" />
-          <button type="button" id="newGroupBtn" style="background:var(--accent);border:none;color:#fff;padding:0 18px;border-radius:10px;font-weight:700">Créer</button>
+          <button type="button" id="newGroupBtn" style="background:var(--accent);border:none;color:var(--accent-ink);padding:0 18px;border-radius:10px;font-weight:700">Créer</button>
         </div>
         <% groups.forEach(function(g){ %>
           <a class="conv-row" href="/groups/<%= g.id %>">
