@@ -134,6 +134,18 @@ function ownFolder(userId, folderId) {
   const f = db.prepare('SELECT 1 FROM folders WHERE id = ? AND user_id = ? AND trashed_at = 0').get(folderId, userId);
   return !!f;
 }
+// Recupere un fichier si l'utilisateur en est proprietaire OU si quelqu'un le lui a partage directement.
+// Renvoie aussi readOnly=true dans le second cas (jamais de renommage/suppression sur un fichier d'autrui).
+function accessibleFile(userId, fileId) {
+  const owned = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ? AND trashed_at = 0').get(fileId, userId);
+  if (owned) return { file: owned, readOnly: false };
+  const shared = db.prepare(`
+    SELECT f.* FROM files f
+    JOIN shares s ON s.file_id = f.id
+    WHERE f.id = ? AND s.shared_with_user_id = ? AND s.revoked_at = 0 AND f.trashed_at = 0
+  `).get(fileId, userId);
+  return shared ? { file: shared, readOnly: true } : null;
+}
 
 // ===========================================================================
 //  AUTHENTIFICATION
@@ -373,15 +385,26 @@ app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => 
 // ===========================================================================
 app.get('/api/download/:id', requireAuth, async (req, res) => {
   const u = res.locals.me;
-  const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ? AND trashed_at = 0').get(req.params.id, u.id);
-  if (!file) return res.status(404).json({ error: 'Fichier introuvable.' });
+  const access = accessibleFile(u.id, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Fichier introuvable.' });
   try {
-    const url = await r2.signedDownloadUrl(file.r2_key, file.name);
+    const url = await r2.signedDownloadUrl(access.file.r2_key, access.file.name);
     res.redirect(url);
   } catch (e) {
     console.error('[download]', e);
     res.status(500).json({ error: 'Impossible de générer le lien de téléchargement.' });
   }
+});
+
+// Apercu direct (miniature image/video), affiche inline plutot que telecharge
+app.get('/api/preview/:id', requireAuth, async (req, res) => {
+  const u = res.locals.me;
+  const access = accessibleFile(u.id, req.params.id);
+  if (!access || !(access.file.mime || '').match(/^(image|video)\//)) return res.status(404).end();
+  try {
+    const url = await r2.signedPreviewUrl(access.file.r2_key);
+    res.redirect(url);
+  } catch (e) { res.status(404).end(); }
 });
 
 // ===========================================================================
@@ -491,6 +514,41 @@ app.post('/api/share/revoke', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Partage direct avec un autre utilisateur du site (pas juste un lien public)
+app.post('/api/share/user', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const { type, id } = req.body;
+  const targetUsername = (req.body.username || '').trim().toLowerCase();
+  const table = type === 'folder' ? 'folders' : 'files';
+  const col = type === 'folder' ? 'folder_id' : 'file_id';
+  const owns = db.prepare(`SELECT 1 FROM ${table} WHERE id = ? AND user_id = ?`).get(id, u.id);
+  if (!owns) return res.status(404).json({ error: 'Introuvable.' });
+  const target = db.prepare('SELECT id, username FROM users WHERE username_lower = ?').get(targetUsername);
+  if (!target) return res.status(404).json({ error: `Aucun utilisateur "${req.body.username}" trouvé.` });
+  if (target.id === u.id) return res.status(400).json({ error: 'Tu ne peux pas te le partager à toi-même.' });
+  const already = db.prepare(`SELECT 1 FROM shares WHERE ${col} = ? AND user_id = ? AND shared_with_user_id = ? AND revoked_at = 0`).get(id, u.id, target.id);
+  if (already) return res.json({ ok: true, username: target.username, already: true });
+  const token = crypto.randomBytes(9).toString('base64url');
+  db.prepare(`INSERT INTO shares (token, user_id, ${col}, shared_with_user_id, created_at) VALUES (?,?,?,?,?)`).run(token, u.id, id, target.id, Date.now());
+  res.json({ ok: true, username: target.username });
+});
+
+// Liste de ce que les autres ont partage directement avec moi
+app.get('/shared-with-me', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const folders = db.prepare(`
+    SELECT f.id, f.name, own.username AS shared_by FROM folders f
+    JOIN shares s ON s.folder_id = f.id JOIN users own ON own.id = s.user_id
+    WHERE s.shared_with_user_id = ? AND s.revoked_at = 0 AND f.trashed_at = 0
+  `).all(u.id);
+  const files = db.prepare(`
+    SELECT f.id, f.name, f.mime, f.size, own.username AS shared_by FROM files f
+    JOIN shares s ON s.file_id = f.id JOIN users own ON own.id = s.user_id
+    WHERE s.shared_with_user_id = ? AND s.revoked_at = 0 AND f.trashed_at = 0
+  `).all(u.id);
+  res.render('shared-with-me', { folders, files, fmtBytes });
+});
+
 // Page publique d'un lien partage (lecture seule, aucun compte requis)
 app.get('/s/:token', async (req, res) => {
   const share = db.prepare('SELECT * FROM shares WHERE token = ? AND revoked_at = 0').get(req.params.token);
@@ -551,6 +609,17 @@ app.get('/s/:token/download', async (req, res) => {
     const url = await r2.signedDownloadUrl(file.r2_key, file.name);
     res.redirect(url);
   } catch (e) { res.status(500).render('404'); }
+});
+
+app.get('/s/:token/preview', async (req, res) => {
+  const share = db.prepare('SELECT * FROM shares WHERE token = ? AND revoked_at = 0').get(req.params.token);
+  if (!share || !share.file_id) return res.status(404).end();
+  const file = db.prepare('SELECT * FROM files WHERE id = ? AND trashed_at = 0').get(share.file_id);
+  if (!file || !(file.mime || '').match(/^(image|video)\//)) return res.status(404).end();
+  try {
+    const url = await r2.signedPreviewUrl(file.r2_key);
+    res.redirect(url);
+  } catch (e) { res.status(404).end(); }
 });
 
 app.use((req, res) => res.status(404).render('404'));

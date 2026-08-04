@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS files (
 
 CREATE TABLE IF NOT EXISTS shares (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  token       TEXT UNIQUE NOT NULL,    -- partie aleatoire du lien /s/:token
+  token       TEXT UNIQUE NOT NULL,    -- partie aleatoire du lien /s/:token (toujours genere, meme pour un partage direct)
   user_id     INTEGER NOT NULL,        -- proprietaire (pour verification / revocation)
   file_id     INTEGER,                 -- soit un fichier...
   folder_id   INTEGER,                 -- ...soit un dossier (jamais les deux a la fois)
@@ -73,6 +73,11 @@ addCol('reset_token',      "TEXT DEFAULT ''");
 addCol('reset_expires',    "INTEGER DEFAULT 0");
 addCol('theme',             "TEXT DEFAULT 'dark'");
 addCol('quota_request_at', "INTEGER DEFAULT 0"); // horodatage de la derniere demande de plus de stockage
+
+// Migration equivalente pour la table shares (partage direct entre utilisateurs)
+const shareCols = db.prepare("PRAGMA table_info(shares)").all().map(c => c.name);
+if (!shareCols.includes('shared_with_user_id')) db.exec('ALTER TABLE shares ADD COLUMN shared_with_user_id INTEGER');
+db.exec('CREATE INDEX IF NOT EXISTS idx_shares_shared_with ON shares(shared_with_user_id)');
 db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users(email_lower) WHERE email_lower != ''");
 
 module.exports = db;

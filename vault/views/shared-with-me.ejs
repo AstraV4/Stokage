@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Partagés avec moi · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+</head>
+<body data-theme="<%= me.theme || 'dark' %>">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><img class="logo" src="/static/img/logo.png" alt="" /> <%= siteName %></div>
+      <div class="new-btn"><button type="button" disabled style="opacity:.4;cursor:default">＋ Nouveau</button></div>
+      <nav class="nav">
+        <a href="/"><span class="ic">🗂️</span> Mes fichiers</a>
+        <a href="/shared-with-me" class="active"><span class="ic">🤝</span> Partagés avec moi</a>
+        <a href="/trash"><span class="ic">🗑️</span> Corbeille</a>
+      </nav>
+      <a class="btn-ghost btn" href="/account" style="margin-top:auto;padding:9px;text-align:center">Mon compte</a>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="menu-toggle" type="button" id="menuToggle">☰</button>
+        <div class="breadcrumb"><span>🤝 Partagés avec moi</span></div>
+      </div>
+      <div class="content">
+        <p style="color:var(--dim);font-size:.82rem;margin-bottom:18px">Ce que d'autres utilisateurs t'ont partagé directement — lecture et téléchargement uniquement.</p>
+        <div class="grid">
+          <% folders.forEach(function(f){ %>
+            <div class="item" data-type="folder" data-id="<%= f.id %>">
+              <div class="thumb" style="background:rgba(59,130,246,.12)">📁</div>
+              <div class="name"><%= f.name %></div>
+              <div class="meta">Partagé par @<%= f.shared_by %></div>
+            </div>
+          <% }) %>
+          <% files.forEach(function(f){ %>
+            <a class="item" href="/api/download/<%= f.id %>" style="text-decoration:none">
+              <div class="thumb">
+                <% if (f.mime && f.mime.startsWith('image/')) { %><img src="/api/preview/<%= f.id %>" loading="lazy" alt="" />
+                <% } else { %><%= f.mime && f.mime.startsWith('video/') ? '🎬' : '📄' %><% } %>
+              </div>
+              <div class="name"><%= f.name %></div>
+              <div class="meta">Par @<%= f.shared_by %> · <%= fmtBytes(f.size) %></div>
+            </a>
+          <% }) %>
+        </div>
+        <% if (!folders.length && !files.length) { %>
+          <div class="empty-state"><div style="font-size:2.4rem;margin-bottom:10px">🤝</div><div>Rien n'a encore été partagé avec toi</div></div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script>
+    const sidebar = document.getElementById('sidebar'), sidebarOverlay = document.getElementById('sidebarOverlay'), menuToggle = document.getElementById('menuToggle');
+    if (menuToggle) menuToggle.addEventListener('click', () => { sidebar.classList.add('open'); sidebarOverlay.classList.add('show'); });
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', () => { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('show'); });
+  </script>
+</body>
+</html>

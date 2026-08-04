@@ -26,6 +26,7 @@
 
       <nav class="nav">
         <a href="/" class="active"><span class="ic">🗂️</span> Mes fichiers</a>
+        <a href="/shared-with-me"><span class="ic">🤝</span> Partagés avec moi</a>
         <a href="/trash"><span class="ic">🗑️</span> Corbeille</a>
       </nav>
 
@@ -63,7 +64,14 @@
           <% }) %>
           <% files.forEach(function(f){ %>
             <div class="item" data-type="file" data-id="<%= f.id %>" data-name="<%= f.name %>">
-              <div class="thumb"><%= f.mime && f.mime.startsWith('image/') ? '🖼️' : (f.mime && f.mime.startsWith('video/') ? '🎬' : '📄') %></div>
+              <div class="thumb">
+                <% if (f.mime && f.mime.startsWith('image/')) { %>
+                  <img src="/api/preview/<%= f.id %>" loading="lazy" alt="" />
+                <% } else if (f.mime && f.mime.startsWith('video/')) { %>
+                  <video src="/api/preview/<%= f.id %>" preload="metadata" muted></video>
+                  <span class="play-badge">▶</span>
+                <% } else { %>📄<% } %>
+              </div>
               <div class="name"><%= f.name %></div>
               <div class="meta"><%= fmtBytes(f.size) %> · <%= new Date(f.created_at).toLocaleDateString('fr-FR') %></div>
               <button class="more" type="button">⋮</button>
@@ -97,7 +105,16 @@
         <input type="text" readonly id="shareLink" value="">
         <button type="button" id="copyLinkBtn">Copier</button>
       </div>
-      <button class="btn-ghost btn" type="button" id="revokeShareBtn" style="margin-bottom:10px">Révoquer ce lien</button>
+      <button class="btn-ghost btn" type="button" id="revokeShareBtn" style="margin-bottom:18px">Révoquer ce lien</button>
+
+      <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px">
+        <p class="sub" style="margin-bottom:10px">Ou partage-le directement à un autre utilisateur du site :</p>
+        <div class="link-row">
+          <input type="text" id="shareUsernameInput" placeholder="pseudo de la personne">
+          <button type="button" id="shareUserBtn">Partager</button>
+        </div>
+      </div>
+
       <button class="modal-close" type="button" id="closeShareModal">Fermer</button>
     </div>
   </div>

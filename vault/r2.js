@@ -59,4 +59,11 @@ async function signedDownloadUrl(key, filename, expiresIn = 300) {
   return getSignedUrl(s3, cmd, { expiresIn });
 }
 
-module.exports = { R2_CONFIGURED, makeR2Key, checkConnection, uploadBuffer, deleteObject, signedDownloadUrl };
+// Lien signe pour AFFICHER le fichier (image/video) directement dans le navigateur,
+// sans forcer un telechargement — utilise pour les apercus/miniatures.
+async function signedPreviewUrl(key, expiresIn = 600) {
+  const cmd = new GetObjectCommand({ Bucket: R2_BUCKET, Key: key, ResponseContentDisposition: 'inline' });
+  return getSignedUrl(s3, cmd, { expiresIn });
+}
+
+module.exports = { R2_CONFIGURED, makeR2Key, checkConnection, uploadBuffer, deleteObject, signedDownloadUrl, signedPreviewUrl };

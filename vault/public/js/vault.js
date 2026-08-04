@@ -158,6 +158,19 @@ if ($('revokeShareBtn')) $('revokeShareBtn').addEventListener('click', async () 
   showToast('Lien révoqué');
   shareOverlay.classList.remove('show');
 });
+if ($('shareUserBtn')) $('shareUserBtn').addEventListener('click', async () => {
+  const input = $('shareUsernameInput');
+  const username = input.value.trim(); if (!username) return;
+  const type = shareOverlay.dataset.type, id = shareOverlay.dataset.id;
+  try {
+    const r = await fetch('/api/share/user', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ type, id, username }) });
+    const data = await r.json();
+    if (!r.ok) return showToast(data.error || 'Erreur', true);
+    showToast(data.already ? 'Déjà partagé avec @' + data.username : '✅ Partagé avec @' + data.username);
+    input.value = '';
+  } catch (e) { showToast('Erreur réseau', true); }
+});
 
 /* ---------- Recherche (remplace la grille par les vrais resultats, meme dans d'autres dossiers) ---------- */
 const searchInput = $('searchInput');

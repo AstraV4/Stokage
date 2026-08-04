@@ -42,8 +42,10 @@
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
 .item{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;transition:.15s;position:relative;display:block}
 .item:hover{border-color:#324158;transform:translateY(-2px)}
-.item .thumb{height:96px;border-radius:8px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;overflow:hidden;background:rgba(255,255,255,.05)}
+.item .thumb{height:96px;border-radius:8px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;overflow:hidden;background:rgba(255,255,255,.05);position:relative}
 .item .thumb img{width:100%;height:100%;object-fit:cover}
+.item .thumb video{width:100%;height:100%;object-fit:cover;pointer-events:none}
+.item .play-badge{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6);background:rgba(0,0,0,.15)}
 .item .name{font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .item .meta{font-size:.7rem;color:var(--dim);margin-top:3px}
 .item .more{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:7px;background:rgba(11,14,20,.75);border:none;color:var(--dim);display:none;align-items:center;justify-content:center}
