@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title><%= folder.name %> · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+</head>
+<body>
+  <div class="app" style="grid-template-columns:1fr">
+    <div class="main">
+      <div class="topbar">
+        <div class="breadcrumb"><span>📁 <%= folder.name %></span></div>
+        <div style="color:var(--dim);font-size:.78rem">Partagé en lecture seule via <%= siteName %></div>
+      </div>
+      <div class="content">
+        <div class="grid">
+          <% folders.forEach(function(f){ %>
+            <a class="item" href="/s/<%= token %>/folder/<%= f.id %>" style="text-decoration:none">
+              <div class="thumb" style="background:rgba(59,130,246,.12)">📁</div>
+              <div class="name"><%= f.name %></div>
+              <div class="meta">Dossier</div>
+            </a>
+          <% }) %>
+          <% files.forEach(function(f){ %>
+            <a class="item" href="/s/<%= token %>/file/<%= f.id %>/download" style="text-decoration:none">
+              <div class="thumb"><%= f.mime && f.mime.startsWith('image/') ? '🖼️' : (f.mime && f.mime.startsWith('video/') ? '🎬' : '📄') %></div>
+              <div class="name"><%= f.name %></div>
+              <div class="meta"><%= fmtBytes(f.size) %></div>
+            </a>
+          <% }) %>
+        </div>
+        <% if (!folders.length && !files.length) { %>
+          <div class="empty-state"><div style="font-size:2.4rem;margin-bottom:10px">📭</div><div>Ce dossier est vide</div></div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

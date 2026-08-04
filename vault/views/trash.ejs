@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0b0e14" />
+<link rel="manifest" href="/manifest.json" />
+<title>Corbeille · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><span class="logo">🔒</span> <%= siteName %></div>
+      <div class="new-btn"><button type="button" disabled style="opacity:.4;cursor:default">＋ Nouveau</button></div>
+      <nav class="nav">
+        <a href="/"><span class="ic">🗂️</span> Mes fichiers</a>
+        <a href="/trash" class="active"><span class="ic">🗑️</span> Corbeille</a>
+      </nav>
+      <form method="POST" action="/logout" style="margin-top:auto">
+        <button class="btn-ghost btn" type="submit" style="padding:9px">Déconnexion</button>
+      </form>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="menu-toggle" type="button" id="menuToggle">☰</button>
+        <div class="breadcrumb"><span>Corbeille</span></div>
+      </div>
+      <div class="content">
+        <p style="color:var(--dim);font-size:.82rem;margin-bottom:18px">Les éléments ici seront restaurables jusqu'à ce que tu les supprimes définitivement.</p>
+        <div class="grid" id="grid">
+          <% folders.forEach(function(f){ %>
+            <div class="item" data-type="folder" data-id="<%= f.id %>" data-name="<%= f.name %>">
+              <div class="thumb" style="background:rgba(59,130,246,.12)">📁</div>
+              <div class="name"><%= f.name %></div>
+              <div class="meta">Dossier</div>
+              <button class="more" type="button">⋮</button>
+            </div>
+          <% }) %>
+          <% files.forEach(function(f){ %>
+            <div class="item" data-type="file" data-id="<%= f.id %>" data-name="<%= f.name %>">
+              <div class="thumb"><%= f.mime && f.mime.startsWith('image/') ? '🖼️' : (f.mime && f.mime.startsWith('video/') ? '🎬' : '📄') %></div>
+              <div class="name"><%= f.name %></div>
+              <div class="meta"><%= fmtBytes(f.size) %></div>
+              <button class="more" type="button">⋮</button>
+            </div>
+          <% }) %>
+        </div>
+        <% if (!folders.length && !files.length) { %>
+          <div class="empty-state"><div style="font-size:2.4rem;margin-bottom:10px">🗑️</div><div>La corbeille est vide</div></div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctx-menu" id="ctxMenu">
+    <button type="button" data-act="restore">↩️ Restaurer</button>
+    <hr>
+    <button type="button" class="danger" data-act="delete-permanent">🗑️ Supprimer définitivement</button>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="/static/js/trash.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+:root{
+  --bg:#0b0e14; --panel:#121620; --panel-2:#161b26; --border:#232a38;
+  --text:#eef1f6; --dim:#8a93a6; --accent:#3b82f6; --accent-2:#22d3ee;
+  --danger:#ef4444; --ok:#22c55e; --radius:12px;
+  --font:'Inter','Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+
+.auth-wrap{min-height:100vh;display:grid;grid-template-columns:1.1fr 1fr}
+@media(max-width:860px){.auth-wrap{grid-template-columns:1fr}.auth-side{display:none}}
+
+/* ---------- Colonne de gauche : identite visuelle ---------- */
+.auth-side{position:relative;overflow:hidden;background:linear-gradient(160deg,#0d1420,#0a0e16 55%,#0b1220);
+  display:flex;flex-direction:column;justify-content:space-between;padding:52px 56px}
+.auth-side::before,.auth-side::after{content:"";position:absolute;border-radius:50%;filter:blur(60px);opacity:.35}
+.auth-side::before{width:420px;height:420px;background:var(--accent);top:-120px;left:-100px;animation:float1 14s ease-in-out infinite}
+.auth-side::after{width:380px;height:380px;background:var(--accent-2);bottom:-140px;right:-100px;animation:float2 16s ease-in-out infinite}
+@keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,50px)}}
+@keyframes float2{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,-40px)}}
+.auth-side-top{position:relative;z-index:2;display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.2rem}
+.auth-side-top .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-size:1.15rem;box-shadow:0 8px 24px rgba(59,130,246,.4)}
+.auth-side-mid{position:relative;z-index:2;max-width:420px}
+.auth-side-mid h1{font-size:2.1rem;font-weight:800;line-height:1.2;margin-bottom:16px;letter-spacing:-.01em}
+.auth-side-mid p{color:var(--dim);font-size:.95rem;line-height:1.6}
+.auth-feats{position:relative;z-index:2;display:flex;flex-direction:column;gap:16px}
+.auth-feat{display:flex;align-items:center;gap:13px}
+.auth-feat .fi{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:1rem;flex:none}
+.auth-feat .ft b{display:block;font-size:.86rem;font-weight:700}
+.auth-feat .ft span{font-size:.76rem;color:var(--dim)}
+
+/* ---------- Colonne de droite : formulaire ---------- */
+.auth-form-col{display:flex;align-items:center;justify-content:center;padding:40px 24px;background:var(--bg)}
+.auth-card{width:100%;max-width:380px;background:transparent;border:none;padding:0}
+.auth-brand{display:none}
+.auth-card h2{font-size:1.5rem;font-weight:800;margin-bottom:6px;letter-spacing:-.01em}
+.auth-card .sub{color:var(--dim);font-size:.88rem;margin-bottom:26px}
+.field{margin-bottom:17px}
+.field label{display:block;font-size:.8rem;font-weight:600;margin-bottom:7px;color:#dde2ea}
+.field input{width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:.92rem;transition:.15s}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+.field .hint{font-size:.72rem;color:var(--dim);margin-top:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:10px;
+  border:none;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:.92rem;transition:.15s;box-shadow:0 10px 26px rgba(59,130,246,.3)}
+.btn:hover{transform:translateY(-1px);box-shadow:0 14px 32px rgba(59,130,246,.4)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);box-shadow:none}
+.btn-ghost:hover{background:rgba(255,255,255,.04);transform:none}
+.error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:11px 14px;border-radius:9px;font-size:.82rem;margin-bottom:18px}
+.switch-link{text-align:center;margin-top:22px;font-size:.85rem;color:var(--dim)}
+.switch-link b{color:var(--accent);cursor:pointer}
+.trust-row{display:flex;align-items:center;gap:8px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);color:var(--dim);font-size:.72rem}

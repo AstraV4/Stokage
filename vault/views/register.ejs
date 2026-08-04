@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0b0e14" />
+<title>Créer un compte · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-side">
+    <div class="auth-side-top"><span class="logo">🔒</span> <%= siteName %></div>
+    <div class="auth-side-mid">
+      <h1>15 Go gratuits,<br/>sans compromis.</h1>
+      <p>Crée ton espace en quelques secondes. Aucune carte bancaire requise pour commencer.</p>
+    </div>
+    <div class="auth-feats">
+      <div class="auth-feat"><div class="fi">📦</div><div class="ft"><b>15 Go de stockage offerts</b><span>Extensible à tout moment</span></div></div>
+      <div class="auth-feat"><div class="fi">⚡</div><div class="ft"><b>Import instantané</b><span>Glisse-dépose tes fichiers, c'est tout</span></div></div>
+      <div class="auth-feat"><div class="fi">📱</div><div class="ft"><b>Installable comme une appli</b><span>Sur téléphone comme sur ordinateur</span></div></div>
+    </div>
+  </div>
+
+  <div class="auth-form-col">
+    <form class="auth-card" method="POST" action="/register">
+      <h2>Créer ton espace</h2>
+      <p class="sub">15 Go de stockage sécurisé, gratuit.</p>
+      <% if (error) { %><div class="error"><%= error %></div><% } %>
+
+      <div class="field">
+        <label>Pseudo</label>
+        <input type="text" name="username" value="<%= username %>" pattern="[a-zA-Z0-9_]{3,20}" autocomplete="username" required autofocus />
+        <div class="hint">3 à 20 caractères : lettres, chiffres, underscore</div>
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <input type="password" name="password" autocomplete="new-password" required minlength="8" />
+        <div class="hint">8 caractères minimum</div>
+      </div>
+      <button class="btn" type="submit">Créer mon compte</button>
+      <p class="switch-link">Déjà un compte ? <a href="/login"><b>Se connecter</b></a></p>
+      <div class="trust-row">🔒 Ton mot de passe est chiffré, personne (pas même nous) ne peut le lire</div>
+    </form>
+  </div>
+</div>
+</body>
+</html>

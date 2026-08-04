@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0b0e14" />
+<link rel="manifest" href="/manifest.json" />
+<title><%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><span class="logo">🔒</span> <%= siteName %></div>
+
+      <div class="new-btn">
+        <button id="newBtn" type="button">＋ Nouveau</button>
+        <div class="new-menu" id="newMenu">
+          <button type="button" id="menuUploadFile">📤 Importer un fichier</button>
+          <button type="button" id="menuNewFolder">➕ Nouveau dossier</button>
+        </div>
+      </div>
+      <input type="file" id="fileInput" hidden />
+
+      <nav class="nav">
+        <a href="/" class="active"><span class="ic">🗂️</span> Mes fichiers</a>
+        <a href="/trash"><span class="ic">🗑️</span> Corbeille</a>
+      </nav>
+
+      <div class="quota">
+        <div class="qlabel"><span>Stockage</span><span id="qPct"><%= Math.round(me.storage_used / me.storage_quota * 100) %>%</span></div>
+        <div class="qtrack"><div class="qfill" style="width:<%= Math.min(100, Math.round(me.storage_used / me.storage_quota * 100)) %>%"></div></div>
+        <div class="qtxt"><b><%= fmtBytes(me.storage_used) %></b> utilisés sur <%= fmtBytes(me.storage_quota) %></div>
+      </div>
+      <form method="POST" action="/logout" style="margin-top:12px">
+        <button class="btn-ghost btn" type="submit" style="padding:9px">Déconnexion</button>
+      </form>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="menu-toggle" type="button" id="menuToggle">☰</button>
+        <div class="breadcrumb" id="breadcrumb">
+          <span data-folder="">Mes fichiers</span>
+          <% breadcrumb.forEach(function(b){ %><span class="sep">›</span><span data-folder="<%= b.id %>"><%= b.name %></span><% }) %>
+        </div>
+        <div class="search"><span>🔎</span><input type="text" placeholder="Rechercher..." id="searchInput"></div>
+        <div class="avatar" title="<%= me.username %>"><%= me.username.slice(0,1).toUpperCase() %></div>
+      </div>
+
+      <div class="content" id="content" data-folder="<%= currentFolder || '' %>">
+        <div class="section-label"><%= folders.length + files.length %> élément<%= (folders.length+files.length) === 1 ? '' : 's' %></div>
+        <div class="grid" id="grid">
+          <% folders.forEach(function(f){ %>
+            <div class="item" data-type="folder" data-id="<%= f.id %>" data-name="<%= f.name %>">
+              <div class="thumb" style="background:rgba(59,130,246,.12)">📁</div>
+              <div class="name"><%= f.name %></div>
+              <div class="meta">Dossier</div>
+              <button class="more" type="button">⋮</button>
+            </div>
+          <% }) %>
+          <% files.forEach(function(f){ %>
+            <div class="item" data-type="file" data-id="<%= f.id %>" data-name="<%= f.name %>">
+              <div class="thumb"><%= f.mime && f.mime.startsWith('image/') ? '🖼️' : (f.mime && f.mime.startsWith('video/') ? '🎬' : '📄') %></div>
+              <div class="name"><%= f.name %></div>
+              <div class="meta"><%= fmtBytes(f.size) %> · <%= new Date(f.created_at).toLocaleDateString('fr-FR') %></div>
+              <button class="more" type="button">⋮</button>
+            </div>
+          <% }) %>
+        </div>
+        <% if (!folders.length && !files.length) { %>
+          <div class="empty-state">
+            <div style="font-size:2.4rem;margin-bottom:10px">📭</div>
+            <div>Ce dossier est vide</div>
+            <p style="color:var(--dim);font-size:.82rem;margin-top:6px">Glisse un fichier ici, ou clique sur "＋ Nouveau"</p>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctx-menu" id="ctxMenu">
+    <button type="button" data-act="share">🔗 Partager</button>
+    <button type="button" data-act="download">⬇️ Télécharger</button>
+    <button type="button" data-act="rename">✏️ Renommer</button>
+    <hr>
+    <button type="button" class="danger" data-act="trash">🗑️ Mettre à la corbeille</button>
+  </div>
+
+  <div class="overlay" id="shareOverlay">
+    <div class="modal">
+      <h3>Partager "<span id="shareFileName"></span>"</h3>
+      <p class="sub">N'importe qui avec le lien peut le voir et le télécharger.</p>
+      <div class="link-row">
+        <input type="text" readonly id="shareLink" value="">
+        <button type="button" id="copyLinkBtn">Copier</button>
+      </div>
+      <button class="btn-ghost btn" type="button" id="revokeShareBtn" style="margin-bottom:10px">Révoquer ce lien</button>
+      <button class="modal-close" type="button" id="closeShareModal">Fermer</button>
+    </div>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dzicon">📥</div>
+    <div class="dztxt">Dépose ici pour importer</div>
+  </div>
+
+  <div class="upload-toast" id="uploadToast" hidden>
+    <div class="ut-name" id="utName">Envoi en cours...</div>
+    <div class="ut-track"><div class="ut-fill" id="utFill"></div></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/static/js/vault.js"></script>
+</body>
+</html>

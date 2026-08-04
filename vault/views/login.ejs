@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0b0e14" />
+<title>Connexion · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-side">
+    <div class="auth-side-top"><span class="logo">🔒</span> <%= siteName %></div>
+    <div class="auth-side-mid">
+      <h1>Tes fichiers,<br/>en sécurité, partout.</h1>
+      <p>Stocke, organise et partage tes photos et vidéos sans jamais perdre en qualité — accessible depuis ton téléphone comme depuis ton ordinateur.</p>
+    </div>
+    <div class="auth-feats">
+      <div class="auth-feat"><div class="fi">🔐</div><div class="ft"><b>Chiffré de bout en bout</b><span>Personne d'autre que toi n'accède à tes fichiers</span></div></div>
+      <div class="auth-feat"><div class="fi">🖼️</div><div class="ft"><b>Qualité d'origine garantie</b><span>Aucune compression, jamais</span></div></div>
+      <div class="auth-feat"><div class="fi">🔗</div><div class="ft"><b>Partage en un lien</b><span>Simple pour toi, simple pour les autres</span></div></div>
+    </div>
+  </div>
+
+  <div class="auth-form-col">
+    <form class="auth-card" method="POST" action="/login">
+      <h2>Content de te revoir</h2>
+      <p class="sub">Connecte-toi pour accéder à tes fichiers.</p>
+      <% if (error) { %><div class="error"><%= error %></div><% } %>
+
+      <div class="field">
+        <label>Pseudo</label>
+        <input type="text" name="username" value="<%= username %>" autocomplete="username" required autofocus />
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <input type="password" name="password" autocomplete="current-password" required />
+      </div>
+      <button class="btn" type="submit">Se connecter</button>
+      <p class="switch-link">Pas encore de compte ? <a href="/register"><b>Créer un compte</b></a></p>
+      <div class="trust-row">🔒 Connexion chiffrée · Mots de passe jamais stockés en clair</div>
+    </form>
+  </div>
+</div>
+</body>
+</html>
