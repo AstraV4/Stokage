@@ -62,4 +62,17 @@ CREATE INDEX IF NOT EXISTS idx_files_user_folder ON files(user_id, folder_id);
 CREATE INDEX IF NOT EXISTS idx_shares_token ON shares(token);
 `);
 
+// Migrations (ajout de colonnes sur une base deja existante, sans rien casser)
+const cols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+const addCol = (name, def) => { if (!cols.includes(name)) db.exec(`ALTER TABLE users ADD COLUMN ${name} ${def}`); };
+addCol('email',            "TEXT DEFAULT ''");
+addCol('email_lower',      "TEXT DEFAULT ''");
+addCol('email_verified',   "INTEGER DEFAULT 0");
+addCol('verify_token',     "TEXT DEFAULT ''");
+addCol('reset_token',      "TEXT DEFAULT ''");
+addCol('reset_expires',    "INTEGER DEFAULT 0");
+addCol('theme',             "TEXT DEFAULT 'dark'");
+addCol('quota_request_at', "INTEGER DEFAULT 0"); // horodatage de la derniere demande de plus de stockage
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users(email_lower) WHERE email_lower != ''");
+
 module.exports = db;

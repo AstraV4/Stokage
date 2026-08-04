@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vérifie ta boîte mail · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+<div class="auth-wrap" style="grid-template-columns:1fr">
+  <div class="auth-form-col">
+    <div class="auth-card" style="text-align:center">
+      <div style="font-size:2.6rem;margin-bottom:12px">📬</div>
+      <h2>Vérifie ta boîte mail</h2>
+      <p class="sub">On t'a envoyé un lien de confirmation à <b><%= email %></b>. Clique dessus pour activer ton compte (pense aussi à vérifier les spams).</p>
+      <a class="btn btn-ghost" href="/login">Retour à la connexion</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

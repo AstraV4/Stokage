@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0b0e14" />
+<title>Mon compte · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+<style>
+  .acc-wrap{max-width:640px;margin:0 auto;padding:36px 20px}
+  .acc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px}
+  .acc-top h1{font-size:1.3rem;font-weight:800}
+  .acc-back{font-size:.85rem;color:var(--dim)}
+  .acc-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:18px}
+  .acc-card h3{font-size:.95rem;margin-bottom:14px}
+  .acc-notice{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#86efac;padding:10px 14px;border-radius:9px;font-size:.82rem;margin-bottom:14px}
+  .theme-row{display:flex;gap:12px}
+  .theme-opt{flex:1;cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+  .theme-opt.active{border-color:var(--accent)}
+  .theme-opt .sw{height:36px;border-radius:8px;margin-bottom:8px}
+  .theme-opt span{font-size:.78rem;font-weight:600}
+</style>
+</head>
+<body data-theme="<%= u.theme || 'dark' %>">
+  <div class="acc-wrap">
+    <div class="acc-top">
+      <h1>Mon compte</h1>
+      <a class="acc-back" href="/">← Retour à mes fichiers</a>
+    </div>
+
+    <div class="acc-card">
+      <h3>📦 Stockage</h3>
+      <div class="qtrack" style="margin-bottom:8px"><div class="qfill" style="width:<%= Math.min(100, Math.round(u.storage_used / u.storage_quota * 100)) %>%"></div></div>
+      <p style="font-size:.82rem;color:var(--dim);margin-bottom:14px"><b style="color:var(--text)"><%= fmtBytes(u.storage_used) %></b> utilisés sur <%= fmtBytes(u.storage_quota) %></p>
+      <% if (quotaSent) { %><div class="acc-notice">✅ Ta demande a bien été envoyée, on te recontacte vite.</div><% } %>
+      <form method="POST" action="/account/request-quota">
+        <button class="btn btn-ghost" type="submit">📈 Demander plus de stockage</button>
+      </form>
+    </div>
+
+    <div class="acc-card">
+      <h3>🎨 Apparence</h3>
+      <form method="POST" action="/account/theme" id="themeForm">
+        <% if (themeok) { %><div class="acc-notice">✅ Thème enregistré.</div><% } %>
+        <input type="hidden" name="theme" id="themeInput" value="<%= u.theme || 'dark' %>" />
+        <div class="theme-row">
+          <div class="theme-opt <%= (u.theme||'dark')==='dark'?'active':'' %>" data-theme="dark">
+            <div class="sw" style="background:linear-gradient(135deg,#0b0e14,#121620)"></div><span>Sombre</span>
+          </div>
+          <div class="theme-opt <%= u.theme==='light'?'active':'' %>" data-theme="light">
+            <div class="sw" style="background:linear-gradient(135deg,#f4f6fa,#ffffff);border:1px solid #e1e5ec"></div><span>Clair</span>
+          </div>
+          <div class="theme-opt <%= u.theme==='violet'?'active':'' %>" data-theme="violet">
+            <div class="sw" style="background:linear-gradient(135deg,#181026,#2c2040)"></div><span>Violet</span>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="acc-card">
+      <h3>🔑 Mot de passe</h3>
+      <% if (pwok) { %><div class="acc-notice">✅ Mot de passe changé.</div><% } %>
+      <% if (pwerr === '1') { %><div class="error">Mot de passe actuel incorrect.</div><% } %>
+      <% if (pwerr === '2') { %><div class="error">Le nouveau mot de passe doit faire au moins 8 caractères.</div><% } %>
+      <form method="POST" action="/account/password">
+        <div class="field"><label>Mot de passe actuel</label><input type="password" name="current" required /></div>
+        <div class="field"><label>Nouveau mot de passe</label><input type="password" name="next" minlength="8" required /></div>
+        <button class="btn" type="submit">Changer le mot de passe</button>
+      </form>
+    </div>
+
+    <form method="POST" action="/logout">
+      <button class="btn btn-ghost" type="submit" style="width:100%">Déconnexion</button>
+    </form>
+  </div>
+
+<script>
+document.querySelectorAll('.theme-opt').forEach(function(opt){
+  opt.addEventListener('click', function(){
+    document.querySelectorAll('.theme-opt').forEach(function(o){ o.classList.remove('active'); });
+    opt.classList.add('active');
+    document.getElementById('themeInput').value = opt.dataset.theme;
+    document.body.setAttribute('data-theme', opt.dataset.theme);
+    document.getElementById('themeForm').submit();
+  });
+});
+</script>
+</body>
+</html>

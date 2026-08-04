@@ -31,6 +31,35 @@ const authLimiter = rateLimit({
 const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 const PORT = process.env.PORT || 3000;
 const SITE_NAME = process.env.SITE_NAME || 'Vault';
+
+// --- E-mail (Resend) : verification d'adresse + reinitialisation de mot de passe ---
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const MAIL_FROM = process.env.MAIL_FROM || ('no-reply@' + (process.env.APP_URL || 'example.com').replace(/^https?:\/\//, '').split('/')[0]);
+const MAIL_ENABLED = !!RESEND_API_KEY;
+function baseUrl(req) {
+  return (req.headers['x-forwarded-proto'] || req.protocol || 'https') + '://' + req.get('host');
+}
+async function sendMail(to, subject, html) {
+  if (!MAIL_ENABLED) { console.warn('[mail] RESEND_API_KEY absente, e-mail non envoye a', to); return; }
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + RESEND_API_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({ from: MAIL_FROM, to, subject, html })
+    });
+    if (!r.ok) console.error('[mail] erreur Resend', r.status, await r.text());
+  } catch (e) { console.error('[mail] exception', e); }
+}
+function mailLayout(title, bodyHtml) {
+  return '<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:30px 20px">' +
+    '<h2 style="color:#111">' + title + '</h2>' + bodyHtml +
+    '<p style="color:#999;font-size:12px;margin-top:30px">' + SITE_NAME + '</p></div>';
+}
+function mailButton(url, label) {
+  return '<p style="margin:24px 0"><a href="' + url + '" style="background:#3b82f6;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:600;display:inline-block">' + label + '</a></p>' +
+    '<p style="color:#999;font-size:12px">Ou copie ce lien : ' + url + '</p>';
+}
+function newToken() { return crypto.randomBytes(24).toString('hex'); }
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 
 function clientIp(req) {
@@ -64,7 +93,7 @@ app.use(session({
 
 app.use((req, res, next) => {
   res.locals.me = req.session.userId
-    ? db.prepare('SELECT id, username, storage_used, storage_quota FROM users WHERE id = ?').get(req.session.userId)
+    ? db.prepare('SELECT id, username, storage_used, storage_quota, theme FROM users WHERE id = ?').get(req.session.userId)
     : null;
   res.locals.siteName = SITE_NAME;
   next();
@@ -111,28 +140,91 @@ function ownFolder(userId, folderId) {
 // ===========================================================================
 app.get('/register', (req, res) => {
   if (req.session.userId) return res.redirect('/');
-  res.render('register', { error: null, username: '' });
+  res.render('register', { error: null, username: '', email: '' });
 });
-app.post('/register', authLimiter, (req, res) => {
+app.post('/register', authLimiter, async (req, res) => {
   const username = (req.body.username || '').trim();
+  const email = (req.body.email || '').trim();
+  const emailLower = email.toLowerCase();
   const password = req.body.password || '';
-  const render = (error) => res.status(400).render('register', { error, username });
+  const render = (error) => res.status(400).render('register', { error, username, email });
 
   if (!validUsername(username)) return render('Pseudo invalide (3 à 20 caractères : lettres, chiffres, _).');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return render('Adresse e-mail invalide.');
   if (password.length < 8) return render('Le mot de passe doit faire au moins 8 caractères.');
   const exists = db.prepare('SELECT 1 FROM users WHERE username_lower = ?').get(username.toLowerCase());
   if (exists) return render('Ce pseudo est déjà pris.');
+  const emailTaken = db.prepare('SELECT 1 FROM users WHERE email_lower = ?').get(emailLower);
+  if (emailTaken) return render('Cette adresse e-mail est déjà utilisée.');
 
   const hash = bcrypt.hashSync(password, 12);
-  const info = db.prepare('INSERT INTO users (username, username_lower, password, created_at) VALUES (?,?,?,?)')
-    .run(username, username.toLowerCase(), hash, Date.now());
+  const verifyToken = MAIL_ENABLED ? newToken() : '';
+  const info = db.prepare('INSERT INTO users (username, username_lower, email, email_lower, password, created_at, email_verified, verify_token) VALUES (?,?,?,?,?,?,?,?)')
+    .run(username, username.toLowerCase(), email, emailLower, hash, Date.now(), MAIL_ENABLED ? 0 : 1, verifyToken);
+
+  if (MAIL_ENABLED) {
+    const link = baseUrl(req) + '/verify?token=' + verifyToken;
+    await sendMail(email, 'Confirme ton adresse e-mail',
+      mailLayout('Bienvenue \u{1F44B}', '<p style="color:#3c4149;font-size:14px;line-height:1.6">Merci de t\'être inscrit sur ' + SITE_NAME + ' ! Clique sur le bouton pour activer ton compte et accéder à tes 15 Go de stockage.</p>' + mailButton(link, 'Confirmer mon adresse')));
+    return res.render('verify-sent', { email, siteName: SITE_NAME });
+  }
   req.session.userId = info.lastInsertRowid;
   res.redirect('/');
 });
 
+app.get('/verify', (req, res) => {
+  const token = (req.query.token || '').toString();
+  const user = token ? db.prepare("SELECT * FROM users WHERE verify_token = ? AND verify_token != ''").get(token) : null;
+  if (!user) return res.render('verify-result', { ok: false, siteName: SITE_NAME });
+  db.prepare("UPDATE users SET email_verified = 1, verify_token = '' WHERE id = ?").run(user.id);
+  res.render('verify-result', { ok: true, siteName: SITE_NAME });
+});
+app.post('/verify/resend', authLimiter, async (req, res) => {
+  const username = (req.body.username || '').trim().toLowerCase();
+  const user = db.prepare('SELECT * FROM users WHERE username_lower = ?').get(username);
+  if (user && !user.email_verified && user.email && MAIL_ENABLED) {
+    const verifyToken = newToken();
+    db.prepare('UPDATE users SET verify_token = ? WHERE id = ?').run(verifyToken, user.id);
+    const link = baseUrl(req) + '/verify?token=' + verifyToken;
+    await sendMail(user.email, 'Confirme ton adresse e-mail', mailLayout('Bienvenue \u{1F44B}', mailButton(link, 'Confirmer mon adresse')));
+  }
+  res.render('verify-sent', { email: user ? user.email : '', siteName: SITE_NAME });
+});
+
+app.get('/forgot', (req, res) => res.render('forgot', { error: null, done: false, siteName: SITE_NAME }));
+app.post('/forgot', authLimiter, async (req, res) => {
+  const email = (req.body.email || '').trim().toLowerCase();
+  const user = email ? db.prepare('SELECT * FROM users WHERE email_lower = ?').get(email) : null;
+  if (user && MAIL_ENABLED) {
+    const resetToken = newToken();
+    const resetExpires = Date.now() + 60 * 60 * 1000;
+    db.prepare('UPDATE users SET reset_token = ?, reset_expires = ? WHERE id = ?').run(resetToken, resetExpires, user.id);
+    const link = baseUrl(req) + '/reset?token=' + resetToken;
+    await sendMail(user.email, 'Réinitialise ton mot de passe',
+      mailLayout('Mot de passe oublié ?', '<p style="color:#3c4149;font-size:14px;line-height:1.6">Clique sur le bouton pour choisir un nouveau mot de passe. Ce lien est valable 1 heure.</p>' + mailButton(link, 'Réinitialiser mon mot de passe')));
+  }
+  res.render('forgot', { error: null, done: true, siteName: SITE_NAME });
+});
+app.get('/reset', (req, res) => {
+  const token = (req.query.token || '').toString();
+  const user = token ? db.prepare("SELECT * FROM users WHERE reset_token = ? AND reset_token != ''").get(token) : null;
+  const valid = !!(user && user.reset_expires > Date.now());
+  res.render('reset', { token, valid, error: null, done: false, siteName: SITE_NAME });
+});
+app.post('/reset', authLimiter, (req, res) => {
+  const token = (req.body.token || '').toString();
+  const password = req.body.password || '';
+  const user = token ? db.prepare("SELECT * FROM users WHERE reset_token = ? AND reset_token != ''").get(token) : null;
+  const valid = !!(user && user.reset_expires > Date.now());
+  if (!valid) return res.render('reset', { token, valid: false, error: null, done: false, siteName: SITE_NAME });
+  if (password.length < 8) return res.render('reset', { token, valid: true, error: 'Le mot de passe doit faire au moins 8 caractères.', done: false, siteName: SITE_NAME });
+  db.prepare("UPDATE users SET password = ?, reset_token = '', reset_expires = 0 WHERE id = ?").run(bcrypt.hashSync(password, 12), user.id);
+  res.render('reset', { token, valid: true, error: null, done: true, siteName: SITE_NAME });
+});
+
 app.get('/login', (req, res) => {
   if (req.session.userId) return res.redirect('/');
-  res.render('login', { error: null, username: '' });
+  res.render('login', { error: null, username: '', unverified: false });
 });
 app.post('/login', authLimiter, (req, res) => {
   const username = (req.body.username || '').trim();
@@ -140,12 +232,52 @@ app.post('/login', authLimiter, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE username_lower = ?').get(username.toLowerCase());
   // Meme message d'erreur, que le pseudo existe ou non (n'aide pas a deviner les comptes existants)
   if (!user || !bcrypt.compareSync(password, user.password)) {
-    return res.status(401).render('login', { error: 'Pseudo ou mot de passe incorrect.', username });
+    return res.status(401).render('login', { error: 'Pseudo ou mot de passe incorrect.', username, unverified: false });
+  }
+  if (MAIL_ENABLED && user.email && !user.email_verified) {
+    return res.status(401).render('login', { error: null, username, unverified: true });
   }
   req.session.userId = user.id;
   res.redirect('/');
 });
 app.post('/logout', (req, res) => { req.session.destroy(() => res.redirect('/login')); });
+
+// ===========================================================================
+//  COMPTE (mot de passe, theme, stockage)
+// ===========================================================================
+const THEMES = ['dark', 'light', 'violet'];
+app.get('/account', requireAuth, (req, res) => {
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  res.render('account', {
+    u, fmtBytes,
+    pwok: req.query.pwok === '1', pwerr: req.query.pwerr || '',
+    themeok: req.query.themeok === '1',
+    quotaSent: req.query.quotasent === '1'
+  });
+});
+app.post('/account/password', requireAuth, (req, res) => {
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  const current = req.body.current || '', next = req.body.next || '';
+  if (!bcrypt.compareSync(current, u.password)) return res.redirect('/account?pwerr=1');
+  if (next.length < 8) return res.redirect('/account?pwerr=2');
+  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(bcrypt.hashSync(next, 12), u.id);
+  res.redirect('/account?pwok=1');
+});
+app.post('/account/theme', requireAuth, (req, res) => {
+  const theme = THEMES.includes(req.body.theme) ? req.body.theme : 'dark';
+  db.prepare('UPDATE users SET theme = ? WHERE id = ?').run(theme, req.session.userId);
+  res.redirect('/account?themeok=1');
+});
+app.post('/account/request-quota', requireAuth, async (req, res) => {
+  const u = res.locals.me;
+  db.prepare('UPDATE users SET quota_request_at = ? WHERE id = ?').run(Date.now(), u.id);
+  const adminEmail = process.env.ADMIN_EMAIL || '';
+  if (adminEmail) {
+    await sendMail(adminEmail, 'Demande de stockage supplémentaire',
+      mailLayout('Demande de stockage', '<p>L\'utilisateur <b>' + u.username + '</b> (' + (u.email || 'pas d\'e-mail') + ') a demandé plus de stockage.</p><p>Utilisé actuellement : ' + fmtBytes(u.storage_used) + ' / ' + fmtBytes(u.storage_quota) + '</p>'));
+  }
+  res.redirect('/account?quotasent=1');
+});
 
 // ===========================================================================
 //  DOSSIERS ET FICHIERS — navigation

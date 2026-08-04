@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#0b0e14" />
 <link rel="manifest" href="/manifest.json" />
 <title>Corbeille · <%= siteName %></title>
 <link rel="stylesheet" href="/static/css/app.css" />
 <link rel="stylesheet" href="/static/css/vault.css" />
 </head>
-<body>
+<body data-theme="<%= me.theme || 'dark' %>">
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <div class="app">
     <aside class="sidebar" id="sidebar">
-      <div class="brand"><span class="logo">🔒</span> <%= siteName %></div>
+      <div class="brand"><img class="logo" src="/static/img/logo.png" alt="" /> <%= siteName %></div>
       <div class="new-btn"><button type="button" disabled style="opacity:.4;cursor:default">＋ Nouveau</button></div>
       <nav class="nav">
         <a href="/"><span class="ic">🗂️</span> Mes fichiers</a>

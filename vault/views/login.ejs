@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#0b0e14" />
 <title>Connexion · <%= siteName %></title>
@@ -10,7 +10,7 @@
 <body>
 <div class="auth-wrap">
   <div class="auth-side">
-    <div class="auth-side-top"><span class="logo">🔒</span> <%= siteName %></div>
+    <div class="auth-side-top"><img class="logo" src="/static/img/logo.png" alt="" /> <%= siteName %></div>
     <div class="auth-side-mid">
       <h1>Tes fichiers,<br/>en sécurité, partout.</h1>
       <p>Stocke, organise et partage tes photos et vidéos sans jamais perdre en qualité — accessible depuis ton téléphone comme depuis ton ordinateur.</p>
@@ -27,6 +27,15 @@
       <h2>Content de te revoir</h2>
       <p class="sub">Connecte-toi pour accéder à tes fichiers.</p>
       <% if (error) { %><div class="error"><%= error %></div><% } %>
+      <% if (unverified) { %>
+        <div class="error">
+          Ton adresse e-mail n'est pas encore confirmée. Regarde ta boîte mail (et les spams).
+          <form method="POST" action="/verify/resend" style="margin-top:8px">
+            <input type="hidden" name="username" value="<%= username %>" />
+            <button class="btn btn-ghost" type="submit" style="padding:7px">Renvoyer le lien de confirmation</button>
+          </form>
+        </div>
+      <% } %>
 
       <div class="field">
         <label>Pseudo</label>
@@ -35,6 +44,7 @@
       <div class="field">
         <label>Mot de passe</label>
         <input type="password" name="password" autocomplete="current-password" required />
+        <div class="hint" style="text-align:right"><a href="/forgot" style="color:var(--accent)">Mot de passe oublié ?</a></div>
       </div>
       <button class="btn" type="submit">Se connecter</button>
       <p class="switch-link">Pas encore de compte ? <a href="/register"><b>Créer un compte</b></a></p>
