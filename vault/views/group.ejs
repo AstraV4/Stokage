@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title><%= group.name %> · <%= siteName %></title>
-<link rel="stylesheet" href="/static/css/app.css" />
-<link rel="stylesheet" href="/static/css/vault.css" />
-<link rel="stylesheet" href="/static/css/social.css" />
+<link rel="stylesheet" href="/static/css/app.css?v=8" />
+<link rel="stylesheet" href="/static/css/vault.css?v=8" />
+<link rel="stylesheet" href="/static/css/social.css?v=8" />
 <style>
   .group-layout{display:grid;grid-template-columns:1fr 240px;height:calc(100vh - 66px)}
   @media(max-width:760px){.group-layout{grid-template-columns:1fr}.group-side{display:none}}
@@ -68,7 +68,7 @@
     </div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/static/js/social.js"></script>
+  <script src="/static/js/social.js?v=8"></script>
   <script>
     const groupId = <%= group.id %>;
     let since = <%= messages.length ? messages[messages.length-1].created_at : 0 %>;
