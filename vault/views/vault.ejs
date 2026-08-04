@@ -12,33 +12,7 @@
 <body data-theme="<%= me.theme || 'dark' %>">
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <div class="app">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand"><img class="logo" src="/static/img/logo.png" alt="" /> <%= siteName %></div>
-
-      <div class="new-btn">
-        <button id="newBtn" type="button">＋ Nouveau</button>
-        <div class="new-menu" id="newMenu">
-          <button type="button" id="menuUploadFile">📤 Importer un fichier</button>
-          <button type="button" id="menuNewFolder">➕ Nouveau dossier</button>
-        </div>
-      </div>
-      <input type="file" id="fileInput" hidden />
-
-      <nav class="nav">
-        <a href="/" class="active"><span class="ic">🗂️</span> Mes fichiers</a>
-        <a href="/shared-with-me"><span class="ic">🤝</span> Partagés avec moi</a>
-        <a href="/trash"><span class="ic">🗑️</span> Corbeille</a>
-      </nav>
-
-      <div class="quota">
-        <div class="qlabel"><span>Stockage</span><span id="qPct"><%= Math.round(me.storage_used / me.storage_quota * 100) %>%</span></div>
-        <div class="qtrack"><div class="qfill" style="width:<%= Math.min(100, Math.round(me.storage_used / me.storage_quota * 100)) %>%"></div></div>
-        <div class="qtxt"><b><%= fmtBytes(me.storage_used) %></b> utilisés sur <%= fmtBytes(me.storage_quota) %></div>
-      </div>
-      <form method="POST" action="/logout" style="margin-top:12px">
-        <button class="btn-ghost btn" type="submit" style="padding:9px">Déconnexion</button>
-      </form>
-    </aside>
+    <%- include('_sidebar', { active: 'files', showNewBtn: true, showQuota: true }) %>
 
     <div class="main">
       <div class="topbar">

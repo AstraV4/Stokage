@@ -11,18 +11,7 @@
 <body data-theme="<%= me.theme || 'dark' %>">
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <div class="app">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand"><img class="logo" src="/static/img/logo.png" alt="" /> <%= siteName %></div>
-      <div class="new-btn"><button type="button" disabled style="opacity:.4;cursor:default">＋ Nouveau</button></div>
-      <nav class="nav">
-        <a href="/"><span class="ic">🗂️</span> Mes fichiers</a>
-        <a href="/shared-with-me"><span class="ic">🤝</span> Partagés avec moi</a>
-        <a href="/trash" class="active"><span class="ic">🗑️</span> Corbeille</a>
-      </nav>
-      <form method="POST" action="/logout" style="margin-top:auto">
-        <button class="btn-ghost btn" type="submit" style="padding:9px">Déconnexion</button>
-      </form>
-    </aside>
+    <%- include('_sidebar', { active: 'trash', showNewBtn: false, showQuota: false }) %>
 
     <div class="main">
       <div class="topbar">

@@ -354,6 +354,176 @@ app.post('/api/friends/nickname', requireAuth, (req, res) => {
 });
 
 // ===========================================================================
+//  GROUPES
+// ===========================================================================
+function isGroupMember(userId, groupId) {
+  return !!db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?').get(groupId, userId);
+}
+function isGroupOwner(userId, groupId) {
+  return !!db.prepare('SELECT 1 FROM groups_ WHERE id = ? AND owner_id = ?').get(groupId, userId);
+}
+
+app.get('/groups', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const groups = db.prepare(`
+    SELECT g.id, g.name, g.owner_id, (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.group_id = g.id) AS member_count
+    FROM groups_ g JOIN group_members gm ON gm.group_id = g.id
+    WHERE gm.user_id = ? ORDER BY g.created_at DESC
+  `).all(u.id);
+  res.render('groups', { groups });
+});
+
+app.post('/api/groups', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const name = (req.body.name || '').trim().slice(0, 60);
+  if (!name) return res.status(400).json({ error: 'Nom de groupe requis.' });
+  const info = db.prepare('INSERT INTO groups_ (name, owner_id, created_at) VALUES (?,?,?)').run(name, u.id, Date.now());
+  db.prepare('INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?,?,?)').run(info.lastInsertRowid, u.id, Date.now());
+  res.json({ ok: true, id: info.lastInsertRowid });
+});
+
+app.get('/groups/:id', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const groupId = parseInt(req.params.id, 10);
+  if (!isGroupMember(u.id, groupId)) return res.status(404).render('404');
+  const group = db.prepare('SELECT * FROM groups_ WHERE id = ?').get(groupId);
+  const members = db.prepare('SELECT usr.id, usr.username, usr.avatar_key FROM group_members gm JOIN users usr ON usr.id = gm.user_id WHERE gm.group_id = ? ORDER BY usr.username COLLATE NOCASE').all(groupId);
+  const messages = db.prepare('SELECT m.*, usr.username AS sender_name FROM messages m JOIN users usr ON usr.id = m.sender_id WHERE m.group_id = ? ORDER BY m.created_at ASC LIMIT 200').all(groupId);
+  res.render('group', { group, members, messages, isOwner: group.owner_id === u.id, meId: u.id });
+});
+
+app.post('/api/groups/:id/rename', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const groupId = parseInt(req.params.id, 10);
+  if (!isGroupOwner(u.id, groupId)) return res.status(403).json({ error: 'Seul le créateur peut renommer le groupe.' });
+  const name = (req.body.name || '').trim().slice(0, 60);
+  if (!name) return res.status(400).json({ error: 'Nom requis.' });
+  db.prepare('UPDATE groups_ SET name = ? WHERE id = ?').run(name, groupId);
+  res.json({ ok: true });
+});
+
+app.post('/api/groups/:id/members', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const groupId = parseInt(req.params.id, 10);
+  if (!isGroupMember(u.id, groupId)) return res.status(404).json({ error: 'Groupe introuvable.' });
+  const username = (req.body.username || '').trim().toLowerCase();
+  const target = db.prepare('SELECT id, username FROM users WHERE username_lower = ?').get(username);
+  if (!target) return res.status(404).json({ error: `Aucun utilisateur "${req.body.username}" trouvé.` });
+  if (isGroupMember(target.id, groupId)) return res.status(400).json({ error: `@${target.username} est déjà dans ce groupe.` });
+  db.prepare('INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?,?,?)').run(groupId, target.id, Date.now());
+  res.json({ ok: true, username: target.username });
+});
+
+// Retirer quelqu'un : uniquement le createur du groupe (regle demandee explicitement)
+app.post('/api/groups/:id/members/remove', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const groupId = parseInt(req.params.id, 10);
+  if (!isGroupOwner(u.id, groupId)) return res.status(403).json({ error: 'Seul le créateur du groupe peut retirer des membres.' });
+  const targetId = parseInt(req.body.user_id, 10);
+  if (targetId === u.id) return res.status(400).json({ error: 'Tu ne peux pas te retirer toi-même ainsi (le groupe a besoin d\'un créateur).' });
+  db.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?').run(groupId, targetId);
+  res.json({ ok: true });
+});
+
+// Quitter un groupe soi-meme (sauf le createur, qui doit d'abord transferer ou supprimer le groupe)
+app.post('/api/groups/:id/leave', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const groupId = parseInt(req.params.id, 10);
+  if (isGroupOwner(u.id, groupId)) return res.status(400).json({ error: 'En tant que créateur, tu dois supprimer le groupe plutôt que le quitter.' });
+  db.prepare('DELETE FROM group_members WHERE group_id = ? AND user_id = ?').run(groupId, u.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/groups/:id/delete', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const groupId = parseInt(req.params.id, 10);
+  if (!isGroupOwner(u.id, groupId)) return res.status(403).json({ error: 'Seul le créateur peut supprimer le groupe.' });
+  db.prepare('DELETE FROM group_members WHERE group_id = ?').run(groupId);
+  db.prepare('DELETE FROM messages WHERE group_id = ?').run(groupId);
+  db.prepare('DELETE FROM groups_ WHERE id = ?').run(groupId);
+  res.json({ ok: true });
+});
+
+// ===========================================================================
+//  MESSAGERIE (privee entre amis, et dans les groupes)
+// ===========================================================================
+function areFriends(userA, userB) {
+  const [a, b] = pair(userA, userB);
+  const f = db.prepare("SELECT 1 FROM friendships WHERE user_a = ? AND user_b = ? AND status = 'accepted'").get(a, b);
+  return !!f;
+}
+
+// Page "Discussions" : vue d'ensemble de toutes les conversations (amis + groupes)
+app.get('/messages', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const friends = db.prepare(`
+    SELECT usr.id, usr.username, usr.avatar_key,
+      (CASE WHEN f.user_a = ? THEN f.nickname_by_a ELSE f.nickname_by_b END) AS nickname,
+      (SELECT content FROM messages m WHERE (m.sender_id = usr.id AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = usr.id) ORDER BY m.id DESC LIMIT 1) AS last_msg,
+      (SELECT created_at FROM messages m WHERE (m.sender_id = usr.id AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = usr.id) ORDER BY m.id DESC LIMIT 1) AS last_at
+    FROM friendships f
+    JOIN users usr ON usr.id = (CASE WHEN f.user_a = ? THEN f.user_b ELSE f.user_a END)
+    WHERE (f.user_a = ? OR f.user_b = ?) AND f.status = 'accepted'
+  `).all(u.id, u.id, u.id, u.id, u.id, u.id, u.id, u.id);
+  friends.sort((a, b) => (b.last_at || 0) - (a.last_at || 0));
+  const groups = db.prepare(`
+    SELECT g.id, g.name,
+      (SELECT content FROM messages m WHERE m.group_id = g.id ORDER BY m.id DESC LIMIT 1) AS last_msg,
+      (SELECT created_at FROM messages m WHERE m.group_id = g.id ORDER BY m.id DESC LIMIT 1) AS last_at
+    FROM groups_ g JOIN group_members gm ON gm.group_id = g.id WHERE gm.user_id = ?
+  `).all(u.id);
+  groups.sort((a, b) => (b.last_at || 0) - (a.last_at || 0));
+  res.render('messages', { friends, groups });
+});
+
+app.get('/chat/friend/:userId', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const otherId = parseInt(req.params.userId, 10);
+  const other = db.prepare('SELECT id, username, avatar_key FROM users WHERE id = ?').get(otherId);
+  if (!other || !areFriends(u.id, otherId)) return res.status(404).render('404');
+  const [a, b] = pair(u.id, otherId);
+  const friendship = db.prepare('SELECT nickname_by_a, nickname_by_b FROM friendships WHERE user_a = ? AND user_b = ?').get(a, b);
+  const nickname = (u.id === a ? friendship.nickname_by_a : friendship.nickname_by_b) || null;
+  const messages = db.prepare('SELECT * FROM messages WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?) ORDER BY created_at ASC LIMIT 300').all(u.id, otherId, otherId, u.id);
+  res.render('chat', { mode: 'friend', other, nickname, groupId: null, messages, meId: u.id });
+});
+
+app.post('/api/messages/send', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const content = (req.body.content || '').trim().slice(0, 2000);
+  if (!content) return res.status(400).json({ error: 'Message vide.' });
+  const recipientId = req.body.recipient_id ? parseInt(req.body.recipient_id, 10) : null;
+  const groupId = req.body.group_id ? parseInt(req.body.group_id, 10) : null;
+  if (recipientId) {
+    if (!areFriends(u.id, recipientId)) return res.status(403).json({ error: 'Vous devez être amis pour vous écrire.' });
+  } else if (groupId) {
+    if (!isGroupMember(u.id, groupId)) return res.status(403).json({ error: 'Tu ne fais pas partie de ce groupe.' });
+  } else {
+    return res.status(400).json({ error: 'Destinataire manquant.' });
+  }
+  const info = db.prepare('INSERT INTO messages (sender_id, recipient_id, group_id, content, created_at) VALUES (?,?,?,?,?)').run(u.id, recipientId, groupId, content, Date.now());
+  res.json({ ok: true, id: info.lastInsertRowid, created_at: Date.now() });
+});
+
+// Sondage des nouveaux messages (rafraichissement simple, sans websocket)
+app.get('/api/messages/poll', requireAuth, (req, res) => {
+  const u = res.locals.me;
+  const since = parseInt(req.query.since, 10) || 0;
+  const friendId = req.query.friend ? parseInt(req.query.friend, 10) : null;
+  const groupId = req.query.group ? parseInt(req.query.group, 10) : null;
+  let rows = [];
+  if (friendId && areFriends(u.id, friendId)) {
+    rows = db.prepare('SELECT * FROM messages WHERE ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)) AND created_at > ? ORDER BY created_at ASC').all(u.id, friendId, friendId, u.id, since);
+  } else if (groupId && isGroupMember(u.id, groupId)) {
+    rows = db.prepare(`
+      SELECT m.*, usr.username AS sender_name FROM messages m JOIN users usr ON usr.id = m.sender_id
+      WHERE m.group_id = ? AND m.created_at > ? ORDER BY m.created_at ASC
+    `).all(groupId, since);
+  }
+  res.json({ messages: rows });
+});
+
+// ===========================================================================
 //  DOSSIERS ET FICHIERS — navigation
 // ===========================================================================
 // Recupere le contenu d'un dossier (ou de la racine si folderId est null),

@@ -1,0 +1,34 @@
+/* ---------- Lignes de conversation (page Discussions) ---------- */
+.conv-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;text-decoration:none;color:inherit;transition:.15s}
+.conv-row:hover{border-color:var(--accent)}
+.conv-av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#f472b6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;color:#fff;background-size:cover;background-position:center}
+.conv-av.group-av{background:linear-gradient(135deg,#22d3ee,#3b82f6);font-size:1.2rem}
+.conv-info{flex:1;min-width:0}
+.conv-name{font-weight:700;font-size:.9rem}
+.conv-last{font-size:.78rem;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Fenetre de discussion ---------- */
+.chat-shell{display:flex;flex-direction:column;height:calc(100vh - 66px)}
+.chat-head{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border)}
+.chat-head .conv-av{width:36px;height:36px;font-size:.9rem}
+.chat-head .chat-title{font-weight:700;font-size:.92rem;flex:1}
+.chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:4px}
+.msg-row{display:flex;flex-direction:column;max-width:70%;margin-bottom:8px}
+.msg-row.mine{align-self:flex-end;align-items:flex-end}
+.msg-row.theirs{align-self:flex-start;align-items:flex-start}
+.msg-sender{font-size:.68rem;color:var(--dim);margin-bottom:2px;padding:0 4px}
+.msg-bubble{padding:9px 13px;border-radius:16px;font-size:.87rem;line-height:1.4;word-wrap:break-word;white-space:pre-wrap}
+.msg-row.mine .msg-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg-row.theirs .msg-bubble{background:var(--panel-2);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg-time{font-size:.65rem;color:var(--dim);margin-top:2px;padding:0 4px}
+.chat-input-row{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border)}
+.chat-input-row input{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:22px;padding:11px 16px;color:var(--text);font-size:.88rem}
+.chat-input-row button{background:var(--accent);border:none;color:#fff;width:42px;height:42px;border-radius:50%;font-size:1rem;flex:none;cursor:pointer}
+.chat-empty{text-align:center;color:var(--dim);font-size:.85rem;margin:auto}
+
+/* ---------- Membres de groupe ---------- */
+.member-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px}
+.member-row:hover{background:rgba(255,255,255,.04)}
+.member-row .conv-av{width:32px;height:32px;font-size:.8rem}
+.member-row .mname{flex:1;font-size:.85rem;font-weight:600}
+.member-row button{background:none;border:none;color:#fca5a5;font-size:.78rem;cursor:pointer}

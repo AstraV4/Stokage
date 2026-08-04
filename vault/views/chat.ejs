@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title><%= nickname || ('@'+other.username) %> · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+<link rel="stylesheet" href="/static/css/social.css" />
+</head>
+<body data-theme="<%= me.theme || 'dark' %>">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app">
+    <%- include('_sidebar', { active: 'messages' }) %>
+    <div class="main">
+      <div class="chat-shell">
+        <div class="chat-head">
+          <button class="menu-toggle" type="button" id="menuToggle" style="margin-right:2px">☰</button>
+          <a href="/messages" style="color:var(--dim);text-decoration:none;font-size:1.1rem">←</a>
+          <a class="conv-av" href="/u/<%= other.username %>" style="<%= other.avatar_key ? 'background-image:url(/api/avatar/'+other.id+');background-size:cover' : '' %>"><%= other.avatar_key ? '' : other.username.slice(0,1).toUpperCase() %></a>
+          <div class="chat-title"><%= nickname || ('@'+other.username) %></div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <% if (!messages.length) { %><div class="chat-empty">Dis bonjour à <%= nickname || ('@'+other.username) %> 👋</div><% } %>
+          <% messages.forEach(function(m){ %>
+            <div class="msg-row <%= m.sender_id === meId ? 'mine' : 'theirs' %>">
+              <div class="msg-bubble"><%= m.content %></div>
+              <div class="msg-time"><%= new Date(m.created_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) %></div>
+            </div>
+          <% }) %>
+        </div>
+        <form class="chat-input-row" id="chatForm">
+          <input type="text" id="chatInput" placeholder="Écrire un message..." maxlength="2000" autocomplete="off" />
+          <button type="submit">➤</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script src="/static/js/social.js"></script>
+  <script>
+    const otherId = <%= other.id %>;
+    let since = <%= messages.length ? messages[messages.length-1].created_at : 0 %>;
+    const box = document.getElementById('chatMessages');
+    function addMsg(m) {
+      const el = document.createElement('div');
+      el.className = 'msg-row ' + (m.sender_id === <%= meId %> ? 'mine' : 'theirs');
+      const b = document.createElement('div'); b.className = 'msg-bubble'; b.textContent = m.content;
+      const t = document.createElement('div'); t.className = 'msg-time'; t.textContent = new Date(m.created_at).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+      el.appendChild(b); el.appendChild(t); box.appendChild(el);
+      box.scrollTop = box.scrollHeight;
+    }
+    box.scrollTop = box.scrollHeight;
+    document.getElementById('chatForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('chatInput');
+      const content = input.value.trim(); if (!content) return;
+      input.value = '';
+      const r = await fetch('/api/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ recipient_id: otherId, content }) });
+      const data = await r.json();
+      if (r.ok) { addMsg({ sender_id: <%= meId %>, content, created_at: data.created_at }); since = data.created_at; }
+    });
+    async function poll() {
+      try {
+        const r = await fetch('/api/messages/poll?friend=' + otherId + '&since=' + since);
+        const data = await r.json();
+        data.messages.forEach(m => { addMsg(m); since = m.created_at; });
+      } catch (e) {}
+      setTimeout(poll, 3000);
+    }
+    poll();
+  </script>
+</body>
+</html>

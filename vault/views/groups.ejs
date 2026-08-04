@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Groupes · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+<link rel="stylesheet" href="/static/css/social.css" />
+</head>
+<body data-theme="<%= me.theme || 'dark' %>">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app">
+    <%- include('_sidebar', { active: 'groups' }) %>
+    <div class="main">
+      <div class="topbar">
+        <button class="menu-toggle" type="button" id="menuToggle">☰</button>
+        <div class="breadcrumb"><span>🧩 Groupes</span></div>
+      </div>
+      <div class="content" style="max-width:560px">
+        <div class="add-friend-row" style="display:flex;gap:8px;margin-bottom:26px">
+          <input type="text" id="newGroupInput" placeholder="Nom du nouveau groupe" style="flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text)" />
+          <button type="button" id="newGroupBtn" style="background:var(--accent);border:none;color:#fff;padding:0 18px;border-radius:10px;font-weight:700">Créer</button>
+        </div>
+        <% groups.forEach(function(g){ %>
+          <a class="conv-row" href="/groups/<%= g.id %>">
+            <div class="conv-av group-av">👥</div>
+            <div class="conv-info"><div class="conv-name"><%= g.name %></div><div class="conv-last"><%= g.member_count %> membre<%= g.member_count>1?'s':'' %></div></div>
+          </a>
+        <% }) %>
+        <% if (!groups.length) { %><div class="empty-state"><div style="font-size:2.4rem;margin-bottom:10px">🧩</div><div>Tu n'as encore aucun groupe</div></div><% } %>
+      </div>
+    </div>
+  </div>
+  <script src="/static/js/social.js"></script>
+  <script>
+    document.getElementById('newGroupBtn').addEventListener('click', async () => {
+      const input = document.getElementById('newGroupInput'); const name = input.value.trim(); if (!name) return;
+      const r = await fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ name }) });
+      const data = await r.json();
+      if (r.ok) location.href = '/groups/' + data.id;
+    });
+  </script>
+</body>
+</html>

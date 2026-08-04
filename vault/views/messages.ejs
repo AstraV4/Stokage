@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" /><link rel="icon" href="/static/img/favicon.png" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Discussions · <%= siteName %></title>
+<link rel="stylesheet" href="/static/css/app.css" />
+<link rel="stylesheet" href="/static/css/vault.css" />
+<link rel="stylesheet" href="/static/css/social.css" />
+</head>
+<body data-theme="<%= me.theme || 'dark' %>">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app">
+    <%- include('_sidebar', { active: 'messages' }) %>
+    <div class="main">
+      <div class="topbar">
+        <button class="menu-toggle" type="button" id="menuToggle">☰</button>
+        <div class="breadcrumb"><span>💬 Discussions</span></div>
+      </div>
+      <div class="content" style="max-width:560px">
+        <% if (!friends.length && !groups.length) { %>
+          <div class="empty-state"><div style="font-size:2.4rem;margin-bottom:10px">💬</div><div>Aucune discussion pour le moment</div><p style="color:var(--dim);font-size:.82rem;margin-top:6px">Ajoute des amis ou crée un groupe pour commencer à discuter</p></div>
+        <% } %>
+        <% groups.forEach(function(g){ %>
+          <a class="conv-row" href="/groups/<%= g.id %>">
+            <div class="conv-av group-av">👥</div>
+            <div class="conv-info"><div class="conv-name"><%= g.name %></div><div class="conv-last"><%= g.last_msg || 'Aucun message encore' %></div></div>
+          </a>
+        <% }) %>
+        <% friends.forEach(function(f){ %>
+          <a class="conv-row" href="/chat/friend/<%= f.id %>">
+            <div class="conv-av" style="<%= f.avatar_key ? 'background-image:url(/api/avatar/'+f.id+');background-size:cover' : '' %>"><%= f.avatar_key ? '' : f.username.slice(0,1).toUpperCase() %></div>
+            <div class="conv-info"><div class="conv-name"><%= f.nickname || ('@'+f.username) %></div><div class="conv-last"><%= f.last_msg || 'Aucun message encore' %></div></div>
+          </a>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+  <script src="/static/js/social.js"></script>
+</body>
+</html>

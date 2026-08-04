@@ -1,0 +1,36 @@
+<aside class="sidebar" id="sidebar">
+  <div class="brand"><img class="logo" src="/static/img/logo.png" alt="" /> <%= siteName %></div>
+  <% if (typeof showNewBtn !== 'undefined' && showNewBtn) { %>
+    <div class="new-btn">
+      <button type="button" id="newBtn">＋ Nouveau</button>
+      <div class="new-menu" id="newMenu">
+        <button type="button" id="menuUploadFile">📤 Importer un fichier</button>
+        <button type="button" id="menuNewFolder">➕ Nouveau dossier</button>
+      </div>
+    </div>
+    <input type="file" id="fileInput" hidden />
+  <% } else { %>
+    <div class="new-btn"><button type="button" disabled style="opacity:.4;cursor:default">＋ Nouveau</button></div>
+  <% } %>
+  <nav class="nav">
+    <a href="/" class="<%= active==='files'?'active':'' %>"><span class="ic">🗂️</span> Mes fichiers</a>
+    <a href="/shared-with-me" class="<%= active==='shared'?'active':'' %>"><span class="ic">🤝</span> Partagés avec moi</a>
+    <a href="/friends" class="<%= active==='friends'?'active':'' %>"><span class="ic">👥</span> Amis</a>
+    <a href="/messages" class="<%= active==='messages'?'active':'' %>"><span class="ic">💬</span> Discussions</a>
+    <a href="/groups" class="<%= active==='groups'?'active':'' %>"><span class="ic">🧩</span> Groupes</a>
+    <a href="/trash" class="<%= active==='trash'?'active':'' %>"><span class="ic">🗑️</span> Corbeille</a>
+  </nav>
+  <% if (typeof showQuota !== 'undefined' && showQuota) { %>
+    <div class="quota">
+      <div class="qlabel"><span>Stockage</span><span id="qPct"><%= Math.round(me.storage_used / me.storage_quota * 100) %>%</span></div>
+      <div class="qtrack"><div class="qfill" style="width:<%= Math.min(100, Math.round(me.storage_used / me.storage_quota * 100)) %>%"></div></div>
+      <div class="qtxt"><b><%= fmtBytes(me.storage_used) %></b> utilisés sur <%= fmtBytes(me.storage_quota) %></div>
+    </div>
+  <% } %>
+  <div style="display:flex;gap:6px;margin-top:<%= (typeof showQuota !== 'undefined' && showQuota) ? '12px' : 'auto' %>">
+    <a class="avatar" href="/account" title="Mon compte"><%= me.username.slice(0,1).toUpperCase() %></a>
+    <form method="POST" action="/logout" style="flex:1">
+      <button class="btn-ghost btn" type="submit" style="padding:9px;width:100%">Déconnexion</button>
+    </form>
+  </div>
+</aside>
